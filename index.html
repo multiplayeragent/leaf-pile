@@ -1,0 +1,1191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Leaf Pile</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: #5d7a3c; }
+  body { font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #3b2414; user-select: none; -webkit-user-select: none; }
+  canvas { display: block; width: 100vw; height: 100vh; height: 100dvh; touch-action: none; cursor: crosshair; }
+  .hud { position: fixed; pointer-events: none; }
+  #bar { top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); box-sizing: border-box; width: min(440px, calc(100vw - 24px));
+         padding: 7px 12px 9px; border-radius: 14px; background: #fff8ecee; box-shadow: 0 3px 14px #3b241433; }
+  #bar .row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-weight: 800; }
+  #day { font-size: 16px; } #clock { font-size: 14px; font-variant-numeric: tabular-nums; color: #7a5a3a; } #clock.hurry { color: #c0392b; }
+  #coins { font-size: 17px; color: #b5651d; white-space: nowrap; }
+  #arm { position: relative; height: 16px; margin-top: 6px; border-radius: 8px; background: #ecdcc4; overflow: hidden; }
+  #armFill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 8px; background: linear-gradient(90deg, #f3a712, #e4572e); transition: width .15s; }
+  #armTxt { position: absolute; inset: 0; text-align: center; font-size: 11px; font-weight: 800; line-height: 16px; color: #fff; text-shadow: 0 1px 2px #3b2414, 0 0 3px #3b2414; }
+  #crew { top: max(10px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); width: 158px; padding: 8px 10px; border-radius: 12px; background: #fff8ecdd; font-size: 12px; box-shadow: 0 2px 10px #3b241426; }
+  #crew:empty { display: none; }
+  #crew div { display: flex; gap: 6px; align-items: center; } #crew i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  #crew span { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } #crew b { font-variant-numeric: tabular-nums; } #crew .me { font-weight: 800; }
+  @media (max-width: 899px) { #crew { display: none; } }
+  #banner { top: calc(max(10px, env(safe-area-inset-top)) + 70px); left: 50%; transform: translateX(-50%); padding: 4px 12px; border-radius: 12px; background: #3b2414cc; color: #ffe8b0; font-size: 14px; font-weight: 800; white-space: nowrap; }
+  #banner:empty { display: none; }
+  #toast { top: calc(max(10px, env(safe-area-inset-top)) + 104px); left: 16px; right: 16px; text-align: center; font-size: 24px; font-weight: 900; color: #fff;
+           text-shadow: 0 2px 0 #3b2414, 0 0 12px #3b2414cc; opacity: 0; transition: opacity .35s; }
+  #hint { left: 16px; right: 16px; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 30px); text-align: center; transition: opacity .8s; }
+  #hint span { display: inline-block; max-width: 560px; padding: 8px 16px; border-radius: 14px; background: #fff8ecee; box-shadow: 0 2px 10px #3b241433; font-size: 15px; font-weight: 800; }
+  #hint small { display: block; font-size: 13px; font-weight: 600; opacity: .75; }
+  #net { bottom: max(10px, env(safe-area-inset-bottom)); left: max(12px, env(safe-area-inset-left)); font-size: 12px; font-weight: 600; color: #fff; text-shadow: 0 1px 2px #3b2414, 0 0 4px #3b2414; }
+  #event { top: calc(max(10px, env(safe-area-inset-top)) + 128px); right: max(12px, env(safe-area-inset-right)); padding: 4px 10px; border-radius: 10px; background: #e4572edd; color: #fff; font-size: 13px; font-weight: 800; }
+  #event:empty { display: none; }
+  .tbtn { position: fixed; border-radius: 50%; border: 2px solid #ffffffbb; background: #3b241477; color: #fff; font: 900 14px system-ui, sans-serif; touch-action: none; }
+  .tbtn:active, .tbtn.on { background: #e4572ecc; }
+  #rakeBtn { right: max(18px, env(safe-area-inset-right)); bottom: max(26px, env(safe-area-inset-bottom)); width: 92px; height: 92px; }
+  #bagBtn { right: calc(max(18px, env(safe-area-inset-right)) + 104px); bottom: max(30px, env(safe-area-inset-bottom)); width: 64px; height: 64px; }
+  #jumpBtn { right: max(30px, env(safe-area-inset-right)); bottom: calc(max(26px, env(safe-area-inset-bottom)) + 104px); width: 64px; height: 64px; }
+  #toolBtn { right: calc(max(18px, env(safe-area-inset-right)) + 92px); bottom: calc(max(26px, env(safe-area-inset-bottom)) + 92px); width: 60px; height: 60px; font-size: 11px; }
+  #over { position: fixed; inset: 0; display: grid; place-items: center; background: #3b241466; }
+  .card { box-sizing: border-box; width: min(380px, calc(100vw - 32px)); max-height: 88vh; overflow: auto; padding: 20px; border-radius: 18px; background: #fff8ec; box-shadow: 0 10px 40px #0004; text-align: center; }
+  .card h2 { margin: 0 0 2px; font-size: 26px; }
+  .card p { margin: 4px 0; font-size: 14px; color: #7a5a3a; }
+  .stats { display: flex; gap: 8px; margin: 12px 0 4px; } .stats div { flex: 1; padding: 8px 4px; border-radius: 12px; background: #f6e7cf; }
+  .stats b { display: block; font-size: 20px; } .stats small { font-size: 11px; color: #7a5a3a; }
+  .card h3 { margin: 14px 0 4px; font-size: 12px; color: #a0714a; text-transform: uppercase; letter-spacing: .06em; text-align: left; }
+  .card ol { text-align: left; margin: 0 0 8px; padding-left: 26px; font-size: 14px; min-height: 20px; }
+  .card li span { float: right; font-variant-numeric: tabular-nums; } .card li.me { font-weight: 800; } .card li i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  button.go { width: 100%; min-height: 48px; margin-top: 8px; border: 0; border-radius: 12px; background: #e4572e; color: #fff; font: 800 17px system-ui, sans-serif; cursor: pointer; box-shadow: 0 4px 0 #a8201a; }
+  [hidden] { display: none !important; }
+  .attract .hud, .attract .tbtn { display: none !important; }
+  .touch #hint { top: calc(max(10px, env(safe-area-inset-top)) + 104px); bottom: auto; } .touch #toast { top: 36%; }
+</style>
+<script src="https://cdn.multiplayeragent.com/sdk/mp.global.js"></script>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div class="hud" id="bar">
+  <div class="row"><span id="day">Afternoon 1</span><span id="clock"></span><span id="coins">🪙 0</span></div>
+  <div id="arm"><div id="armFill"></div><div id="armTxt"></div></div>
+</div>
+<div class="hud" id="crew"></div>
+<div class="hud" id="banner"></div>
+<div class="hud" id="event"></div>
+<div class="hud" id="toast"></div>
+<div class="hud" id="hint"></div>
+<div class="hud" id="net">Connecting…</div>
+<button class="tbtn" id="toolBtn" hidden>BLOWER</button>
+<button class="tbtn" id="jumpBtn" hidden>JUMP</button>
+<button class="tbtn" id="bagBtn" hidden>BAG</button>
+<button class="tbtn" id="rakeBtn" hidden>RAKE</button>
+<div id="over" hidden>
+  <div class="card">
+    <h2 id="overTitle">Sundown!</h2>
+    <p id="overSub"></p>
+    <div class="stats">
+      <div><b id="stCoins">0</b><small>your coins</small></div>
+      <div><b id="stBags">0</b><small>bags filled</small></div>
+      <div><b id="stJump">0</b><small>biggest jump</small></div>
+    </div>
+    <h3>This afternoon's crew</h3>
+    <ol id="crewList"></ol>
+    <h3>Most coins in one afternoon</h3>
+    <ol id="board"><li>Loading the leaderboard…</li></ol>
+    <button class="go" id="again">Play again</button>
+    <p id="next"></p>
+  </div>
+</div>
+<script>
+/* ═══ LEAF PILE · a Multiplayer Agent starter ══════════════════════════════════════════
+ * Rake the yard's fallen leaves into big piles, bag them for coins, and jump in the big ones.
+ * Drop-in, 1–8 players; bot neighbors rake too.
+ *
+ * WHERE THINGS ARE (search for the "── " headers):
+ *   CONFIG ........ every number worth tuning: raking, piles, bags, jumps, the blower, waves, gusts, bots
+ *   CONNECTION .... MP_CONNECT, joining, the offline room, who is host, live ops
+ *   THE YARD ...... the yard as a grid of cells: house, trees, fence, sidewalk
+ *   LEAVES ........ leaf counts on the wire (chunks), my own raking blended on top, the action stream
+ *   RAKING ........ the rake, the blower, dropping, bagging, jumping (the same for players and bots)
+ *   AFTERNOON (HOST) the round, leaf waves, wind gusts, piles, coins, applying everyone's actions
+ *   BOTS (HOST) ... neighbors who pick a spot, rake leaves to it, bag the pile (and sometimes jump in)
+ *   ME ............ my raker: walking, raking, dropping, bagging, jumping, sending my actions
+ *   OTHERS ........ everyone else, eased between snapshots
+ *   DRAW .......... camera, the painted yard, the leaf layer, piles, people, falling leaves, canopies, wind
+ *   HUD & RESULTS . clock, coins, armful, banners, results card, leaderboard, sound
+ *   INPUT ......... keys, mouse, touch stick and buttons
+ *   MAIN LOOP ..... frame(), start()
+ *
+ * HOW THE MULTIPLAYER WORKS (a relay room: no server code):
+ *   - Leaves on the ground are a count per cell (0–63). The HOST owns them and publishes them in
+ *     4 shared fields `g0`…`g3`, a 24×15 block each: {v, h}, one letter per cell, v goes up on
+ *     every write. Only blocks that changed, at most 4 times a second.
+ *   - Piles are objects, not cells: the host writes `piles` {v, n: next id, l: [[id, x×10, y×10,
+ *     leaves], …]}. Bags, coins, the clock, waves and gusts live in `day` (ONE JSON field, `v` only
+ *     goes up): {id, v, ph, ends, wave, gust, bagsN, sc: {id: [coins, bags, biggest jump, blower,
+ *     name, color]}, res}.
+ *   - Each player moves its OWN raker and rakes on its own screen at once. Every 100ms it sends
+ *     the host one "act" {g: afternoon id, s: number, o: oldest unacknowledged, a: [actions]}:
+ *     ["r", cell, n, …] raked, ["m", from, to, n, …] blown, ["d", x, y] dropped my armful,
+ *     ["b", pile] bagged, ["j", pile] jumped in, ["u"] bought the blower. The host applies them
+ *     in order (taking only leaves that are really there) and writes `ack` {player: [last number
+ *     applied, armful]} after the blocks and piles that carry them. Until then my screen adds my
+ *     unacknowledged actions on top of the host's state, so raked leaves never pop back. Nothing
+ *     acknowledged in 2.5s (the host changed?): send it all again; the host skips any it applied.
+ *   - Each player writes its OWN entity: `p` (one JSON field: position, facing, raking, armful,
+ *     tool, jumping) 10 times a second, `hb` (heartbeat) once a second, `n`/`c` once.
+ *   - The HOST is the lowest sessionId among live players (heartbeat seen in the last 3s), worked
+ *     out every frame. It also runs the bots (`bots`, 10/s), the leaf waves and the gusts. A new
+ *     host adopts everything from state and carries on: same afternoon, same clock, same piles.
+ *   - Effects are events: "bag" and "whee" (someone jumped in a pile).
+ *   - Leaderboard "most-coins": the most coins a player made in one afternoon.
+ *   - Live ops: `leafScale` makes every wave bigger or smaller; events show top right.
+ *   - ?attract plays offline with bots only (the preview video is recorded from it).
+ */
+
+// ── CONFIG ──────────────────────────────────────────────────────────────────────────
+// Distances are in cells (a cell is about half a meter).
+const CONFIG = {
+  dayMs: 180000,         // one afternoon
+  resultsMs: 13000,      // the results card, then the next afternoon
+  seats: 4,              // bot neighbors fill the yard up to this many rakers
+  speed: 4.6,            // cells per second, empty-handed
+  carrySlow: 0.35,       // a full armful slows you by this share
+  rakeAhead: 1.0,        // the rake's head is this far in front of you
+  rakeR: 1.15,           // ... and gathers leaves within this of it
+  rakeRate: 30,          // leaves per second the rake gathers while you walk (a third of it standing still)
+  carryCap: 120,         // the most leaves you can carry
+  mergeR: 1.9,           // drop within this of a pile and you add to it
+  bagMin: 30,            // a pile needs this many leaves to bag it
+  leavesPerCoin: 10,     // a bag pays a coin per this many leaves...
+  bigBag: 120,           // ... and half again for a pile this big
+  jumpMin: 60,           // a pile this big is worth jumping into
+  jumpScatter: 0.55,     // share of the pile a jump throws back onto the lawn
+  reach: 2.4,            // how close you must be to bag or jump into a pile
+  blowerCost: 25,        // coins for the leaf blower (this afternoon)
+  blowR: 4.5,            // the blower's reach
+  blowRate: 70,          // leaves per second the blower pushes
+  waveMs: 34000,         // a wave of falling leaves this often...
+  waveLen: 6000,         // ... over this long...
+  waveLeaves: 520,       // ... this many leaves (live config: leafScale multiplies it)
+  firstWave: 14000,      // the first wave, after the start of the afternoon
+  gustEvery: [26000, 36000], // ms between wind gusts
+  gustWarn: 2500,        // the warning before a gust
+  gustLen: 2600,         // how long it blows
+  gustShare: 0.3,        // each step of a gust moves this share of every cell's leaves one cell downwind
+  smallPile: 45,         // piles smaller than this lose leaves to a gust
+  blanket: [2, 7],       // leaves per cell when the afternoon starts (more under the trees)
+  leafScale: 1,          // live ops: multiplies every wave
+  botPace: 0.85,         // bots move at this share of your speed
+  sendMs: 100,           // ms between my "act" messages and my position updates
+  flushMs: 250,          // ms between the host's writes of the leaf blocks
+  resendMs: 2500,        // resend actions the host hasn't acknowledged after this long
+  board: "most-coins",   // leaderboard name
+};
+const COLORS = ["#d1495b", "#3a86ff", "#2a9d8f", "#9b5de5", "#f15bb5", "#06aed5", "#8ac926", "#ff7b00", "#6d597a", "#264653"];
+const BOT_NAMES = ["Maple", "Acorn", "Hazel", "Rusty", "Pip", "Willow", "Juniper", "Basil", "Clove", "Sorrel"];
+const LEAF = ["#e4572e", "#f3a712", "#a8201a", "#f9c74f", "#c97b3d", "#d1495b"];
+
+// ── CONNECTION ──────────────────────────────────────────────────────────────────────
+// The builder fills these in for this game. Downloaded from GitHub? Put your own pk_ key here.
+const MP_CONNECT = {
+  key: 'pk_REPLACE_ME',
+  room: 'leaf-pile',
+  endpoint: 'wss://live.multiplayeragent.com',
+  apiUrl: 'https://api.multiplayeragent.com',
+};
+const ATTRACT = new URLSearchParams(location.search).has("attract");
+if (ATTRACT) Object.assign(CONFIG, { seats: 6, firstWave: 600, waveMs: 20000, gustEvery: [7000, 9000], botPace: 1.05, resultsMs: 1500 });
+
+/** Same shape as the SDK client, kept in this tab: offline play and ?attract. */
+function localRoom() {
+  const id = "local", state = { entities: { players: { [id]: {} } }, shared: {} }, subs = [];
+  let queued = false;
+  const emit = () => { if (!queued) { queued = true; queueMicrotask(() => { queued = false; subs.forEach((f) => f(state)); }); } };
+  const put = (o, k, v) => { if (typeof k === "object") Object.assign(o, k); else o[k] = v; emit(); };
+  return {
+    sessionId: id, state, offline: true, live: { config: {}, active: [] },
+    me: { set: (k, v) => put(state.entities.players[id], k, v) },
+    setShared: (k, v) => put(state.shared, k, v),
+    onState: (f) => { subs.push(f); f(state); }, onJoin() {}, onLeave() {}, on() {}, send() {}, onLive() {},
+    onDisconnect() {}, onReconnect() {}, leave: async () => {},
+  };
+}
+async function connect() {
+  if (ATTRACT || typeof MP === "undefined") return localRoom();
+  try {
+    const mp = await Promise.race([MP.join({ ...MP_CONNECT }), new Promise((_, no) => setTimeout(() => no(new Error("timed out")), 10000))]);
+    window.mp = mp; // the builder calls window.mp.leave() when the page closes
+    return mp;
+  } catch (e) {
+    console.warn("Playing offline:", e && e.message);
+    return localRoom();
+  }
+}
+const parse = (v, fallback) => { if (typeof v !== "string") return fallback; try { return JSON.parse(v); } catch { return fallback; } };
+const memo = new Map();
+/** A JSON value from state, parsed once per change (read-only: never mutate what this returns). */
+function parseOnce(key, raw, fallback) { const m = memo.get(key); if (m && m.raw === raw) return m.v; const v = parse(raw, fallback); memo.set(key, { raw, v }); return v; }
+const shared = (key, fallback) => parseOnce("shared:" + key, S.shared[key], fallback);
+let net = null, S = { entities: { players: {} }, shared: {} };
+const seenHb = new Map(); // sessionId -> { hb, at } on OUR clock
+/** Players whose heartbeat moved in the last 3s (plus us), sorted by sessionId. */
+function livePlayers() {
+  const now = performance.now(), out = [];
+  for (const [id, p] of Object.entries(S.entities.players || {})) {
+    const s = seenHb.get(id);
+    if (!s || s.hb !== p.hb) seenHb.set(id, { hb: p.hb, at: now });
+    if (id === net.sessionId || now - seenHb.get(id).at < 3000) out.push(id);
+  }
+  return out.sort();
+}
+let wakeHold = 0, lastFrameAt = 0; // a tab whose frames stopped (frozen, or in the background) doesn't host, nor for 700ms after it wakes (see frame())
+const isHost = () => livePlayers()[0] === net.sessionId && performance.now() >= wakeHold && !(lastFrameAt && performance.now() - lastFrameAt > 1000);
+const liveNum = (key, fallback, lo, hi) => { const v = Number(((net && net.live && net.live.config) || {})[key]); return Number.isFinite(v) && v > 0 ? Math.max(lo, Math.min(hi, v)) : fallback; };
+function mulberry32(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const rnd = (a, b) => a + Math.random() * (b - a), pick = (l) => l[Math.floor(Math.random() * l.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+
+// ── THE YARD ────────────────────────────────────────────────────────────────────────
+// 48×30 cells. The house along the top, four big trees (and a young one), a picket fence round
+// three sides, the sidewalk and the curb along the bottom where the full bags go.
+const NX = 48, NY = 30, N = NX * NY, CELL = 20;
+const idx = (x, y) => y * NX + x;
+const cellAt = (x, y) => idx(clamp(Math.floor(x), 0, NX - 1), clamp(Math.floor(y), 0, NY - 1));
+const HOUSE = { x0: 15, y0: 0, x1: 33, y1: 5.2 };
+const TREES = [{ x: 7.5, y: 9.5, r: 4.4 }, { x: 40.5, y: 9, r: 4.2 }, { x: 11.5, y: 22, r: 3.8 }, { x: 37, y: 21.5, r: 4 }, { x: 24.5, y: 14.5, r: 2.8 }]; // r: the crown (leaves fall a bit wider)
+const WALK = { x0: 1.1, x1: NX - 1.1, y0: 1.1, y1: 27.6 };   // inside the fence, above the curb
+const CURB_Y = 28.6;
+const open = new Uint8Array(N); // 1 = leaves can lie here
+for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++) {
+  const cx = x + 0.5, cy = y + 0.5, inHouse = cx > HOUSE.x0 && cx < HOUSE.x1 && cy < HOUSE.y1;
+  open[idx(x, y)] = !inHouse && cx > 0.8 && cx < NX - 0.8 && cy > 0.8 && cy < 28.2 ? 1 : 0;
+}
+/** Keep someone out of the house, the tree trunks and the fence. */
+function collide(s) {
+  s.x = clamp(s.x, WALK.x0, WALK.x1); s.y = clamp(s.y, WALK.y0, WALK.y1);
+  const r = 0.55, cx = clamp(s.x, HOUSE.x0, HOUSE.x1), cy = clamp(s.y, HOUSE.y0, HOUSE.y1), dx = s.x - cx, dy = s.y - cy, d = Math.hypot(dx, dy);
+  if (d < r) { if (d > 1e-4) { s.x = cx + (dx / d) * r; s.y = cy + (dy / d) * r; } else s.y = HOUSE.y1 + r; }
+  for (const t of TREES) { const tx = s.x - t.x, ty = s.y - t.y, td = Math.hypot(tx, ty), min = 0.75 + r; if (td < min && td > 1e-4) { s.x = t.x + (tx / td) * min; s.y = t.y + (ty / td) * min; } }
+}
+
+// ── LEAVES ──────────────────────────────────────────────────────────────────────────
+// On the wire a cell is one letter: A = 0 … _ = 63. The grid is 4 chunks of 24×15 cells.
+const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+const B64I = new Uint8Array(128); for (let i = 0; i < 64; i++) B64I[B64.charCodeAt(i)] = i;
+const CW = 24, CH = 15, CHUNKS = 4, MAXLEAF = 63;
+function eachChunkCell(k, f) { const x0 = (k % 2) * CW, y0 = Math.floor(k / 2) * CH; let n = 0; for (let y = y0; y < y0 + CH; y++) for (let x = x0; x < x0 + CW; x++) f(idx(x, y), n++); }
+function encodeChunk(k, h) { let s = ""; eachChunkCell(k, (i) => { s += B64[clamp(Math.round(h[i]), 0, MAXLEAF)]; }); return s; }
+const chunkV = (k) => { const c = shared("g" + k, null); return c && typeof c.v === "number" ? c.v : 0; };
+const view = { q: new Uint8Array(N), raw: [] }; // the host's grid as state has it
+function readChunks() {
+  for (let k = 0; k < CHUNKS; k++) {
+    const raw = S.shared["g" + k];
+    if (raw === view.raw[k]) continue;
+    view.raw[k] = raw;
+    const c = parse(raw, null);
+    if (c && typeof c.h === "string" && c.h.length === CW * CH) eachChunkCell(k, (i, n) => { view.q[i] = B64I[c.h.charCodeAt(n)] || 0; });
+  }
+}
+// My actions the host hasn't acknowledged: their leaf changes are added on top of its grid on my
+// screen, my dropped piles show as ghosts, piles I bagged or jumped in are hidden.
+const pend = { sum: new Float32Array(N), batches: [], seq: 0, lastSend: 0, acts: [], rake: new Map(), move: new Map(), ghost: null, hide: [] };
+function resetPending() { pend.sum.fill(0); pend.batches = []; pend.acts = []; pend.rake.clear(); pend.move.clear(); pend.ghost = null; pend.hide = []; }
+/** The leaves on a cell as this screen should use it: the host's grid, or the shared one plus my unacknowledged changes. */
+const leavesAt = (i) => (world.acting ? world.h[i] : Math.max(0, view.q[i] + pend.sum[i]));
+/** How an actor changes leaves: the host straight into its grid (credited to `id`), a player through the action stream. */
+function hostApi(id) {
+  return {
+    get: (i) => world.h[i],
+    take(i, n) { const t = Math.min(n, world.h[i]); world.h[i] -= t; world.carry[id] = (world.carry[id] || 0) + t; return t; },
+    move(f, t, n) { const m = Math.min(n, world.h[f], MAXLEAF - world.h[t]); world.h[f] -= m; world.h[t] += m; return m; },
+    act(a) { applyAct(id, a); },
+  };
+}
+const localApi = {
+  get: (i) => Math.max(0, view.q[i] + pend.sum[i]),
+  take(i, n) { const t = Math.min(n, localApi.get(i)); if (t > 0) { pend.sum[i] -= t; pend.rake.set(i, (pend.rake.get(i) || 0) + t); } return t; },
+  move(f, t, n) { const m = Math.min(n, localApi.get(f), MAXLEAF - localApi.get(t)); if (m > 0) { pend.sum[f] -= m; pend.sum[t] += m; const k = f * N + t; pend.move.set(k, (pend.move.get(k) || 0) + m); } return m; },
+  act(a) { flushRakes(); pend.acts.push(a); },
+};
+/** Turn the raking and blowing gathered since the last action into actions (so they stay in order with drops). */
+function flushRakes() {
+  if (pend.rake.size) { const r = ["r"]; for (const [i, n] of pend.rake) r.push(i, n); pend.acts.push(r); pend.rake.clear(); }
+  if (pend.move.size) { const m = ["m"]; for (const [k, n] of pend.move) m.push(Math.floor(k / N), k % N, n); pend.acts.push(m); pend.move.clear(); }
+}
+/** Every 100ms: send what I did as one "act". */
+function sendActs(now) {
+  if (world.acting || now - pend.lastSend < CONFIG.sendMs) return;
+  flushRakes();
+  if (!pend.acts.length) return;
+  pend.lastSend = now;
+  const d = [], g = day()?.id ?? 0;
+  for (const a of pend.acts) {
+    if (a[0] === "r") for (let j = 1; j < a.length; j += 2) d.push(a[j], -a[j + 1]);
+    if (a[0] === "m") for (let j = 1; j < a.length; j += 3) d.push(a[j], -a[j + 2], a[j + 1], a[j + 2]);
+  }
+  const b = { s: ++pend.seq, g, a: pend.acts, d, ghost: pend.ghost, hide: pend.hide, at: now };
+  pend.batches.push(b); pend.acts = []; pend.ghost = null; pend.hide = [];
+  net.send("act", { g, s: b.s, o: pend.batches[0].s, a: b.a });
+}
+/** The host has my actions: stop adding them myself; my armful is whatever it says once nothing is in flight. */
+function readAck() {
+  const a = shared("ack", {})[net.sessionId];
+  if (!Array.isArray(a)) return;
+  while (pend.batches.length && pend.batches[0].s <= a[0]) { const b = pend.batches.shift(); for (let j = 0; j < b.d.length; j += 2) pend.sum[b.d[j]] -= b.d[j + 1]; }
+  if (!pend.batches.length && !pend.acts.length && !pend.rake.size && !world.acting) { me.carry = +a[1] || 0; const g = day(); if (g && me.tool && !scOf(g, me.id)[3]) me.tool = 0; } // the host didn't sell me the blower
+}
+function resendActs(now) {
+  if (world.acting || !pend.batches.length || now - pend.batches[0].at < CONFIG.resendMs) return;
+  for (const b of pend.batches) { b.at = now; net.send("act", { g: b.g, s: b.s, o: pend.batches[0].s, a: b.a }); }
+}
+/** The piles as this screen draws them: the host's, minus the ones I just bagged or jumped, plus my dropped armful. */
+function pilesNow() {
+  const list = world.acting ? world.piles.l : (shared("piles", null) || { l: [] }).l || [];
+  if (world.acting) return list.map((p) => ({ id: p[0], x: p[1] / 10, y: p[2] / 10, n: p[3] }));
+  const hide = new Set(pend.batches.flatMap((b) => b.hide).concat(pend.hide)), out = [];
+  for (const p of list) if (Array.isArray(p) && !hide.has(p[0])) out.push({ id: p[0], x: p[1] / 10, y: p[2] / 10, n: p[3] });
+  for (const g of pend.batches.map((b) => b.ghost).concat([pend.ghost])) if (g) { const near = out.find((p) => Math.hypot(p.x - g.x, p.y - g.y) < CONFIG.mergeR); if (near) near.n += g.n; else out.push({ id: "ghost", x: g.x, y: g.y, n: g.n }); }
+  return out;
+}
+
+// ── RAKING ──────────────────────────────────────────────────────────────────────────
+// A raker is me or a bot: { id, x, y, a (facing), carry, raking, tool (0 rake, 1 blower), moving, jumpAt }.
+const headOf = (s) => ({ x: s.x + Math.cos(s.a) * CONFIG.rakeAhead, y: s.y + Math.sin(s.a) * CONFIG.rakeAhead });
+/** Gather leaves under the rake's head into the armful. */
+function rakeStep(s, dt, api) {
+  const room = CONFIG.carryCap - s.carry;
+  if (room <= 0) return 0;
+  s.rakeAcc = (s.rakeAcc || 0) + CONFIG.rakeRate * dt * (s.moving ? 1 : 0.35);
+  let want = Math.min(room, Math.floor(s.rakeAcc));
+  if (want <= 0) return 0;
+  s.rakeAcc -= want;
+  const h = headOf(s), R = CONFIG.rakeR, cells = [];
+  for (let y = Math.floor(h.y - R); y <= Math.floor(h.y + R); y++) for (let x = Math.floor(h.x - R); x <= Math.floor(h.x + R); x++) {
+    if (x < 0 || y < 0 || x >= NX || y >= NY) continue;
+    const i = idx(x, y), d = Math.hypot(x + 0.5 - h.x, y + 0.5 - h.y);
+    if (d <= R && api.get(i) > 0) cells.push([i, d]);
+  }
+  cells.sort((p, q) => p[1] - q[1]);
+  let got = 0;
+  for (const [i] of cells) { if (want <= 0) break; const t = api.take(i, Math.min(want, 2)); got += t; want -= t; }
+  if (want > 0) for (const [i] of cells) { if (want <= 0) break; const t = api.take(i, want); got += t; want -= t; }
+  if (s !== me || !world.acting) s.carry += got; else s.carry = world.carry[me.id] || 0;
+  if (got && Math.random() < 0.5) flick(h.x, h.y, 1);
+  return got;
+}
+/** The blower: push leaves in a cone in front of you two cells further on. */
+function blowStep(s, dt, api) {
+  s.blowAcc = (s.blowAcc || 0) + CONFIG.blowRate * dt;
+  let budget = Math.floor(s.blowAcc);
+  if (budget <= 0) return;
+  s.blowAcc -= budget;
+  const ca = Math.cos(s.a), sa = Math.sin(s.a), R = CONFIG.blowR, cells = [];
+  for (let y = Math.floor(s.y - R); y <= Math.floor(s.y + R); y++) for (let x = Math.floor(s.x - R); x <= Math.floor(s.x + R); x++) {
+    if (x < 0 || y < 0 || x >= NX || y >= NY) continue;
+    const dx = x + 0.5 - s.x, dy = y + 0.5 - s.y, along = dx * ca + dy * sa, side = -dx * sa + dy * ca;
+    if (along < 0.4 || along > R || Math.abs(side) > 0.6 + along * 0.45) continue;
+    const i = idx(x, y); if (api.get(i) > 0) cells.push([i, along, x + 0.5 + ca * 2.2, y + 0.5 + sa * 2.2]);
+  }
+  cells.sort((p, q) => p[1] - q[1]);
+  for (const [i, , tx, ty] of cells) {
+    if (budget <= 0) break;
+    const t = cellAt(tx, ty); if (!open[t] || t === i) continue;
+    budget -= api.move(i, t, Math.min(budget, 3));
+  }
+  if (Math.random() < 0.6) windFx(s.x + ca * 1.5, s.y + sa * 1.5, ca, sa);
+}
+const nearestPile = (s, min) => pilesNow().filter((p) => p.n >= min && p.id !== "ghost").reduce((b, p) => { const d = Math.hypot(p.x - s.x, p.y - s.y); return d <= CONFIG.reach + pileR(p.n) * 0.5 && (!b || d < b.d) ? { ...p, d } : b; }, null);
+const pileR = (n) => 0.55 + Math.sqrt(n) * 0.11; // a pile's radius in cells
+
+// ── AFTERNOON (HOST) ────────────────────────────────────────────────────────────────
+const world = {
+  acting: false, h: new Uint8Array(N), ver: new Array(CHUNKS).fill(0), sent: new Array(CHUNKS).fill(null), flushFrom: 0,
+  applied: {}, carry: {}, ackSent: "", piles: { n: 1, l: [] }, pilesDirty: false, pilesSent: "", bots: new Map(), lastDay: null,
+  lastFlush: 0, lastBots: 0, waveAcc: 0, again: false,
+};
+function day() { const g = shared("day", null); return world.acting && world.lastDay && (!g || world.lastDay.v > g.v) ? world.lastDay : g; }
+function writeDay(g) { g = { ...g, v: Math.max(day()?.v ?? 0, shared("day", null)?.v ?? 0) + 1 }; world.lastDay = g; net.setShared("day", JSON.stringify(g)); return g; }
+const scOf = (g, id) => (g.sc && g.sc[id]) || [0, 0, 0, 0, "", ""];
+/** Change one raker's score line: coins, bags, biggest jump, blower. */
+function score(id, fn) {
+  const g = day(); if (!g) return;
+  const who = everyone().find((r) => r.id === id), cur = [...scOf(g, id)];
+  fn(cur); cur[4] = who ? String(who.name).slice(0, 16) : cur[4] || "Raker"; cur[5] = who ? who.color : cur[5] || "#999";
+  writeDay({ ...g, sc: { ...g.sc, [id]: cur } });
+}
+/** A fresh afternoon: a blanket of leaves (thicker under the trees), no piles, empty arms. */
+function newDay(id) {
+  const r = mulberry32((Math.random() * 2 ** 31) | 0);
+  for (let i = 0; i < N; i++) {
+    if (!open[i]) { world.h[i] = 0; continue; }
+    const x = (i % NX) + 0.5, y = Math.floor(i / NX) + 0.5, under = TREES.reduce((m, t) => Math.max(m, 1 - Math.hypot(x - t.x, y - t.y) / (t.r * 1.4)), 0);
+    world.h[i] = Math.round(CONFIG.blanket[0] + r() * (CONFIG.blanket[1] - CONFIG.blanket[0]) + Math.max(0, under) * 9 * r());
+  }
+  world.piles = { n: 1, l: [] }; world.pilesDirty = true; world.carry = {};
+  for (const b of world.bots.values()) Object.assign(b, { carry: 0, home: null, task: null });
+  if (ATTRACT) attractPrefill();
+  flushGrid(true); flushPiles();
+  const t = Date.now();
+  return writeDay({ id, ph: "on", ends: t + CONFIG.dayMs, wave: [0, t + CONFIG.firstWave], gust: [t + rnd(...CONFIG.gustEvery), Math.random() < 0.5 ? 1 : -1, 0], bagsN: 0, sc: {}, res: null });
+}
+/** Become host: take the leaves, piles, acknowledgements, armfuls and bots exactly as state has them. */
+function adoptWorld() {
+  world.acting = true; world.lastDay = null;
+  for (let k = 0; k < CHUNKS; k++) {
+    const c = shared("g" + k, null);
+    if (c && typeof c.h === "string" && c.h.length === CW * CH) { eachChunkCell(k, (i, n) => { world.h[i] = B64I[c.h.charCodeAt(n)] || 0; }); world.ver[k] = c.v || 0; world.sent[k] = c.h; }
+    else { eachChunkCell(k, (i) => { world.h[i] = open[i] ? 3 : 0; }); world.ver[k] = (c && c.v) || 0; world.sent[k] = null; }
+  }
+  const pl = shared("piles", null);
+  world.piles = pl && Array.isArray(pl.l) ? { n: +pl.n || 1, l: pl.l.map((p) => [...p]) } : { n: 1, l: [] }; world.pilesSent = ""; world.pilesDirty = false;
+  world.applied = {}; world.carry = {};
+  for (const [id, a] of Object.entries(shared("ack", {}))) if (Array.isArray(a)) { world.applied[id] = a[0]; world.carry[id] = +a[1] || 0; }
+  world.ackSent = "";
+  // My own actions no host has applied yet: apply them now (my screen already shows them).
+  const g = shared("day", null), done = world.applied[net.sessionId] ?? 0;
+  flushRakes();
+  const mine = [...pend.batches.filter((b) => b.s > done && (!g || b.g === g.id)).flatMap((b) => b.a), ...pend.acts];
+  world.carry[net.sessionId] = mine.length ? world.carry[net.sessionId] || 0 : me.carry;
+  for (const a of mine) applyAct(net.sessionId, a);
+  if (pend.batches.length) world.applied[net.sessionId] = pend.batches[pend.batches.length - 1].s;
+  resetPending();
+  world.bots.clear();
+  for (const b of shared("bots", [])) if (b && typeof b.x === "number") world.bots.set(b.i, Object.assign(newRaker(b.i, b.n, b.c), { x: b.x, y: b.y, a: +b.a || 0, carry: +b.l || 0, tool: 0 }));
+  world.lastFlush = world.lastBots = performance.now();
+  fitBots();
+  if (!g) newDay(1);
+}
+/** One action from a player (or the host's own, or a bot's), applied to the real yard. */
+function applyAct(id, a) {
+  if (!Array.isArray(a)) return;
+  const T = a[0], h = world.h, okCell = (i) => Number.isInteger(i) && i >= 0 && i < N;
+  if (T === "r") for (let j = 1; j + 1 < a.length; j += 2) { const i = a[j], n = a[j + 1]; if (!okCell(i) || !(n > 0)) continue; const t = Math.min(n, h[i], CONFIG.carryCap - (world.carry[id] || 0)); if (t > 0) { h[i] -= t; world.carry[id] = (world.carry[id] || 0) + t; } }
+  else if (T === "m") for (let j = 1; j + 2 < a.length; j += 3) { const f = a[j], t = a[j + 1], n = a[j + 2]; if (!okCell(f) || !okCell(t) || !open[t] || !(n > 0)) continue; const m = Math.min(n, h[f], MAXLEAF - h[t]); h[f] -= m; h[t] += m; }
+  else if (T === "d") dropPile(id, a[1] / 10, a[2] / 10);
+  else if (T === "b") bagPile(id, a[1]);
+  else if (T === "j") jumpPile(id, a[1]);
+  else if (T === "u") { const g = day(); if (g && scOf(g, id)[0] >= CONFIG.blowerCost && !scOf(g, id)[3]) score(id, (s) => { s[0] -= CONFIG.blowerCost; s[3] = 1; }); }
+}
+/** An armful lands: on a pile close by, or as a new pile. */
+function dropPile(id, x, y) {
+  const n = Math.round(world.carry[id] || 0); world.carry[id] = 0;
+  if (n <= 0 || !Number.isFinite(x) || !Number.isFinite(y)) return;
+  x = clamp(x, 1.2, NX - 1.2); y = clamp(y, 1.2, 27.8);
+  const L = world.piles.l;
+  let near = L.reduce((b, p) => { const d = Math.hypot(p[1] / 10 - x, p[2] / 10 - y); return d < CONFIG.mergeR + pileR(p[3]) * 0.4 && (!b || d < b[0]) ? [d, p] : b; }, null);
+  if (!near && L.length >= 28) near = L.reduce((b, p) => { const d = Math.hypot(p[1] / 10 - x, p[2] / 10 - y); return !b || d < b[0] ? [d, p] : b; }, null);
+  if (near) near[1][3] = Math.min(999, near[1][3] + n);
+  else L.push([world.piles.n++, Math.round(x * 10), Math.round(y * 10), n]);
+  world.pilesDirty = true;
+}
+function bagPile(id, pid) {
+  const L = world.piles.l, k = L.findIndex((p) => p[0] === pid);
+  if (k < 0 || L[k][3] < CONFIG.bagMin) return;
+  const [, x, y, n] = L[k], coins = Math.floor((n / CONFIG.leavesPerCoin) * (n >= CONFIG.bigBag ? 1.5 : 1));
+  L.splice(k, 1); world.pilesDirty = true;
+  score(id, (s) => { s[0] += coins; s[1] += 1; });
+  const g = day(); if (g) writeDay({ ...g, bagsN: (g.bagsN || 0) + 1 });
+  const fx = { x: x / 10, y: y / 10, n, coins, by: id }; net.send("bag", fx); bagFx(fx);
+}
+function jumpPile(id, pid) {
+  const L = world.piles.l, p = L.find((q) => q[0] === pid);
+  if (!p || p[3] < CONFIG.jumpMin) return;
+  const n = p[3], out = Math.round(n * CONFIG.jumpScatter), px = p[1] / 10, py = p[2] / 10;
+  for (let k = 0; k < out; k++) { const a = rnd(0, 6.28), d = Math.sqrt(Math.random()) * (pileR(n) + 2.4), i = cellAt(px + Math.cos(a) * d, py + Math.sin(a) * d); if (open[i] && world.h[i] < MAXLEAF) world.h[i]++; }
+  p[3] = n - out; if (p[3] < 8) L.splice(L.indexOf(p), 1);
+  world.pilesDirty = true;
+  score(id, (s) => { s[2] = Math.max(s[2], n); });
+  const fx = { x: px, y: py, n, by: id }; net.send("whee", fx); wheeFx(fx);
+}
+/** Write the leaf blocks that changed (a few at a time), the piles, then `ack` once every applied action is in them. */
+function flushGrid(force) {
+  let writes = 0;
+  for (let n = 0; n < CHUNKS; n++) {
+    const k = (world.flushFrom + n) % CHUNKS, h = encodeChunk(k, world.h);
+    if (h === world.sent[k]) continue;
+    if (!force && writes >= 3) { world.flushFrom = k; return; }
+    world.ver[k] = Math.max(world.ver[k], chunkV(k)) + 1;
+    net.setShared("g" + k, JSON.stringify({ v: world.ver[k], h })); world.sent[k] = h; writes++;
+  }
+  flushPiles();
+  const keep = {};
+  for (const id of new Set([...Object.keys(world.applied), ...Object.keys(world.carry)])) if (S.entities.players[id]) keep[id] = [world.applied[id] || 0, Math.round(world.carry[id] || 0)];
+  const a = JSON.stringify(keep);
+  if (a !== world.ackSent) { world.ackSent = a; net.setShared("ack", a); }
+}
+function flushPiles() {
+  if (!world.pilesDirty) return;
+  world.pilesDirty = false;
+  const cur = shared("piles", null), raw = JSON.stringify({ v: Math.max(world.piles.v || 0, (cur && cur.v) || 0) + 1, n: world.piles.n, l: world.piles.l });
+  world.piles.v = JSON.parse(raw).v;
+  if (raw !== world.pilesSent) { world.pilesSent = raw; net.setShared("piles", raw); }
+}
+/** An "act" message: someone's batch of actions. Applied once, in order. */
+function onAct(from, msg) {
+  if (!msg || !Array.isArray(msg.a) || !Number.isInteger(msg.s)) return;
+  let a = world.applied[from] ?? (Number.isInteger(msg.o) ? msg.o - 1 : msg.s - 1);
+  if (Number.isInteger(msg.o) && a < msg.o - 1) a = msg.o - 1;
+  world.applied[from] = a;
+  if (msg.s !== a + 1) return; // already applied, or one is missing (the resend brings it, in order)
+  world.applied[from] = msg.s;
+  const g = day();
+  if (!g || msg.g !== g.id || g.ph !== "on") return;
+  for (const act of msg.a.slice(0, 40)) applyAct(from, act);
+}
+/** Leaves come down from the trees during a wave, heaviest under each crown. */
+function waveTick(g, t, dt) {
+  const [n, at] = g.wave;
+  if (t < at || t > at + CONFIG.waveLen) return;
+  world.waveAcc += (CONFIG.waveLeaves * liveNum("leafScale", CONFIG.leafScale, 0.2, 4) * dt) / (CONFIG.waveLen / 1000);
+  while (world.waveAcc >= 1) {
+    world.waveAcc -= 1;
+    const tr = pick(TREES), a = rnd(0, 6.28), d = Math.sqrt(Math.random()) * tr.r * 1.25, i = cellAt(tr.x + Math.cos(a) * d, tr.y + Math.sin(a) * d * 0.9);
+    if (open[i] && world.h[i] < MAXLEAF) world.h[i]++;
+  }
+}
+/** A gust: every cell's leaves drift one cell downwind, and small piles shed leaves. */
+function gustStep(dx) {
+  const h = world.h, moved = new Int16Array(N);
+  for (let i = 0; i < N; i++) {
+    if (!h[i]) continue;
+    const x = i % NX, y = Math.floor(i / NX), t = idx(clamp(x + dx, 0, NX - 1), clamp(y + (Math.random() < 0.3 ? (Math.random() < 0.5 ? 1 : -1) : 0), 0, NY - 1));
+    if (!open[t] || t === i) continue;
+    const m = Math.floor(h[i] * CONFIG.gustShare + Math.random());
+    moved[i] -= m; moved[t] += m;
+  }
+  for (let i = 0; i < N; i++) h[i] = clamp(h[i] + moved[i], 0, MAXLEAF);
+  const L = world.piles.l;
+  for (let k = L.length - 1; k >= 0; k--) {
+    const p = L[k]; if (p[3] >= CONFIG.smallPile) continue;
+    const shed = Math.ceil(p[3] * 0.35);
+    for (let j = 0; j < shed; j++) { const i = cellAt(p[1] / 10 + dx * rnd(1, 4), p[2] / 10 + rnd(-1.5, 1.5)); if (open[i] && h[i] < MAXLEAF) h[i]++; }
+    p[3] -= shed; if (p[3] < 6) L.splice(k, 1);
+    world.pilesDirty = true;
+  }
+}
+/** The clock, waves, gusts (4 times a second). */
+function hostRules(g, t, dt) {
+  if (!g) return g;
+  if (g.ph === "on") {
+    waveTick(g, t, dt);
+    if (t > g.wave[1] + CONFIG.waveLen) g = writeDay({ ...g, wave: [g.wave[0] + 1, t + CONFIG.waveMs - CONFIG.waveLen] });
+    const [gt, dx] = g.gust;
+    if (t >= gt && t <= gt + CONFIG.gustLen) gustStep(dx);
+    else if (t > gt + CONFIG.gustLen) g = writeDay({ ...g, gust: [t + rnd(...CONFIG.gustEvery), Math.random() < 0.5 ? 1 : -1, 0] });
+    if (t >= g.ends) {
+      for (const r of everyone()) if (r.carry > 0) { const hd = headOf(r); dropPile(r.id, hd.x, hd.y); } // armfuls fall where they are
+      const res = Object.entries(g.sc || {}).filter(([id]) => !(ATTRACT && id === me.id)).map(([id, s]) => ({ id, n: s[4], c: s[5], coins: s[0], bags: s[1], jump: s[2] })).sort((a, b) => b.coins - a.coins).slice(0, 10);
+      g = writeDay({ ...g, ph: "end", ends: t + CONFIG.resultsMs, res });
+    }
+  } else if (g.ph === "end" && (t > g.ends || world.again)) { world.again = false; g = newDay(g.id + 1); }
+  return g;
+}
+function hostTick(dt, now) {
+  if (!world.acting) adoptWorld();
+  fitBots();
+  let g = day();
+  for (const b of world.bots.values()) botTick(b, dt, now, g);
+  if (now - world.lastFlush > CONFIG.flushMs) {
+    const fdt = Math.min(1, (now - world.lastFlush) / 1000);
+    world.lastFlush = now;
+    g = hostRules(g, Date.now(), fdt);
+    flushGrid(false);
+  }
+  if (now - world.lastBots > 100) {
+    world.lastBots = now;
+    net.setShared("bots", JSON.stringify([...world.bots.values()].map((b) => ({ i: b.id, n: b.name, c: b.color, x: +b.x.toFixed(2), y: +b.y.toFixed(2), a: +b.a.toFixed(2), l: Math.round(b.carry), r: b.raking ? 1 : 0, t: b.tool, w: b.moving ? 1 : 0, j: b.jumpAt && now - b.jumpAt < 700 ? 1 : 0 }))));
+  }
+}
+
+// ── BOTS (HOST) ─────────────────────────────────────────────────────────────────────
+// A bot neighbor picks a spot for its pile where the leaves are thick, then over and over:
+// walks out to the leafiest patch near it, rakes its way back and drops the armful on the pile.
+// A big enough pile gets bagged (or, now and then, jumped in first). Gusts send it back to work.
+function newRaker(id, name, color) {
+  return { id, name, color, x: 24, y: 24, a: -Math.PI / 2, carry: 0, raking: false, tool: 0, moving: false, jumpAt: 0, rakeAcc: 0, home: null, task: null, waitUntil: 0, bagAt: rnd(70, 120), stuck: 0 };
+}
+function fitBots() {
+  const humans = livePlayers().filter((id) => !(ATTRACT && id === net.sessionId)).length, want = Math.max(0, CONFIG.seats - humans - (ATTRACT ? 1 : 0));
+  while (world.bots.size > want) world.bots.delete([...world.bots.keys()].pop());
+  while (world.bots.size < want) {
+    const used = new Set(everyone().map((r) => r.color)), names = new Set([...world.bots.values()].map((b) => b.name)), id = "b" + Math.random().toString(36).slice(2, 6);
+    const b = newRaker(id, BOT_NAMES.find((n) => !names.has(n)) || "Raker", COLORS.find((c) => !used.has(c)) || pick(COLORS));
+    b.x = rnd(4, 44); b.y = rnd(22, 26); world.bots.set(id, b);
+  }
+  const people = new Set(everyone().filter((r) => !r.bot).map((r) => r.color));
+  for (const b of world.bots.values()) if (people.has(b.color)) { const used = new Set(everyone().map((r) => r.color)); b.color = COLORS.find((c) => !used.has(c)) || b.color; }
+}
+/** How many leaves lie within r of (x, y). */
+function leavesNear(x, y, r, get) { let n = 0; for (let yy = Math.floor(y - r); yy <= y + r; yy++) for (let xx = Math.floor(x - r); xx <= x + r; xx++) if (xx >= 0 && yy >= 0 && xx < NX && yy < NY && Math.hypot(xx + 0.5 - x, yy + 0.5 - y) <= r) n += get(idx(xx, yy)); return n; }
+function pickHome(b, get) {
+  const others = [...world.bots.values(), me].filter((o) => o !== b && o.home);
+  let best = null, bs = -1;
+  for (let k = 0; k < 40; k++) {
+    const x = rnd(3, NX - 3), y = rnd(7, 26), i = cellAt(x, y);
+    if (!open[i] || TREES.some((t) => Math.hypot(t.x - x, t.y - y) < 1.8)) continue;
+    const s = leavesNear(x, y, 6, get) - others.reduce((p, o) => p + Math.max(0, 9 - Math.hypot(o.home.x - x, o.home.y - y)) * 40, 0) - Math.hypot(x - b.x, y - b.y) * 4;
+    if (s > bs) { bs = s; best = { x, y }; }
+  }
+  return best;
+}
+/** The leafiest little patch within reach of home, not right on it. */
+function pickPatch(b, get) {
+  let best = null, bs = -1;
+  for (let k = 0; k < 24; k++) {
+    const a = rnd(0, 6.28), d = rnd(2.5, 6.5), x = clamp(b.home.x + Math.cos(a) * d, 1.5, NX - 1.5), y = clamp(b.home.y + Math.sin(a) * d, 1.5, 27.3);
+    const s = leavesNear(x, y, 1.6, get);
+    if (s > bs) { bs = s; best = { x, y, n: s }; }
+  }
+  return best;
+}
+function walkTo(s, tx, ty, pace, dt) {
+  const dx = tx - s.x, dy = ty - s.y, d = Math.hypot(dx, dy);
+  s.moving = d > 0.2;
+  if (!s.moving) return d;
+  const want = Math.atan2(dy, dx); s.a += clamp(angDiff(want, s.a), -8 * dt, 8 * dt);
+  const sp = CONFIG.speed * pace * (1 - CONFIG.carrySlow * (s.carry / CONFIG.carryCap)) * Math.max(0.25, Math.cos(angDiff(want, s.a)));
+  s.x += Math.cos(s.a) * Math.min(sp * dt, d); s.y += Math.sin(s.a) * Math.min(sp * dt, d);
+  collide(s);
+  return d;
+}
+function botTick(b, dt, now, g) {
+  b.raking = false;
+  if (!g || g.ph !== "on") { b.moving = false; return; }
+  if (b.jumpAt && now - b.jumpAt < 900) { b.moving = false; return; }
+  if (now < b.waitUntil) { b.moving = false; return; }
+  const api = b === me ? (world.acting ? hostApi(me.id) : localApi) : hostApi(b.id), get = api.get;
+  if (!b.home || (b.task === null && leavesNear(b.home.x, b.home.y, 7, get) < 20 && b.carry < 10)) { b.home = pickHome(b, get); b.task = null; if (!b.home) return; }
+  const pile = pilesNow().find((p) => p.id !== "ghost" && Math.hypot(p.x - b.home.x, p.y - b.home.y) < CONFIG.mergeR + 0.5);
+  if (b.task === null) {
+    if (pile && pile.n >= b.bagAt && b.carry < 5) b.task = { k: "bag", pid: pile.id };
+    else if (b.carry >= CONFIG.carryCap * 0.85) b.task = { k: "home" };
+    else { const p = pickPatch(b, get); b.task = p && p.n > 3 ? { k: "out", x: p.x, y: p.y } : { k: "home" }; }
+  }
+  const t = b.task;
+  if (t.k === "out") { // walk out (rake up), turn around, then rake back home
+    if (walkTo(b, t.x, t.y, CONFIG.botPace, dt) < 0.5) b.task = { k: "home" };
+  } else if (t.k === "home") {
+    const hx = b.home.x - Math.cos(b.a) * CONFIG.rakeAhead * 0.6, hy = b.home.y - Math.sin(b.a) * CONFIG.rakeAhead * 0.6, hd = headOf(b), left = Math.hypot(b.home.x - hd.x, b.home.y - hd.y);
+    walkTo(b, hx, hy, CONFIG.botPace * 0.8, dt);
+    b.raking = left > 0.8 && b.carry < CONFIG.carryCap;
+    if (b.raking) rakeStep(b, dt, api);
+    if (left < 1.0 || (!b.moving && b.carry > 0)) { if (b.carry > 0) { api.act(["d", Math.round(hd.x * 10), Math.round(hd.y * 10)]); b.carry = 0; } b.task = null; b.waitUntil = now + rnd(150, 500); }
+  } else if (t.k === "bag") {
+    const p = pilesNow().find((q) => q.id === t.pid);
+    if (!p) { b.task = null; return; }
+    const st = { x: p.x, y: p.y + pileR(p.n) + 0.6 };
+    if (walkTo(b, st.x, st.y, CONFIG.botPace, dt) < 0.6) {
+      b.a = Math.atan2(p.y - b.y, p.x - b.x);
+      if (p.n >= 100 && Math.random() < (ATTRACT ? (b === me ? 1 : 0.35) : 0.2)) { b.jumpAt = now; api.act(["j", p.id]); } // the host's jumpPile/bagPile show the effects
+      else api.act(["b", p.id]);
+      b.task = null; b.bagAt = rnd(70, 130); b.waitUntil = now + 500;
+    }
+  }
+  b.stuck = b.moving && Math.hypot(b.x - (b.lx ?? b.x), b.y - (b.ly ?? b.y)) < 0.01 ? b.stuck + dt : 0; b.lx = b.x; b.ly = b.y;
+  if (b.stuck > 1.5) { b.stuck = 0; b.task = null; b.a += Math.PI * rnd(0.6, 1.4); }
+}
+/** ?attract: piles already started all over, everyone mid-job, so the preview is busy at once. */
+function attractPrefill() {
+  const crew = [me, ...world.bots.values()], spots = [[19, 19.5], [31, 12], [20, 25], [42, 16], [5, 16], [30, 22]]; // mine first: the preview camera follows me
+  crew.forEach((b, k) => {
+    const [x, y] = spots[k % spots.length];
+    b.home = { x, y }; b.x = x + (k ? rnd(-3, 3) : 3.2); b.y = y + (k ? rnd(1.5, 3) : 0.6); b.a = Math.PI; b.carry = k ? rnd(30, 90) : 90; b.task = null; b.bagAt = k === 0 ? 120 : rnd(90, 130);
+    if (b === me) world.carry[me.id] = 90;
+    world.piles.l.push([world.piles.n++, Math.round(x * 10), Math.round(y * 10), Math.round(k === 0 ? 75 : rnd(40, 100))]);
+  });
+}
+
+// ── ME ──────────────────────────────────────────────────────────────────────────────
+const myName = (() => { try { return localStorage.getItem("mpa-name") || ""; } catch { return ""; } })() || pick(["Cozy", "Crunchy", "Toasty", "Rusty", "Sunny", "Breezy"]) + " " + pick(["Raker", "Neighbor", "Squirrel", "Acorn", "Pumpkin"]);
+const me = Object.assign(newRaker("", myName, COLORS[0]), { dayId: 0, lastSend: 0, tools: 0, startedAt: 0, rakedOnce: false, wasRaking: false, rustle: 0 });
+function joinDay(g) { me.dayId = g.id; me.carry = 0; me.tool = 0; resetPending(); $("over").hidden = true; overDismissed = -1; }
+function myTick(dt, now) {
+  const g = day();
+  if (g && g.id !== me.dayId) joinDay(g);
+  const api = world.acting ? hostApi(me.id) : localApi;
+  if (world.acting) me.carry = world.carry[me.id] || 0;
+  if (ATTRACT) { botTick(me, dt, now, g); if (world.acting) me.carry = world.carry[me.id] || 0; publish(now); return; }
+  const on = g && g.ph === "on", jumping = me.jumpAt && now - me.jumpAt < 700, mv = jumping ? { x: 0, y: 0 } : moveInput();
+  const len = Math.hypot(mv.x, mv.y);
+  me.moving = len > 0.1;
+  if (me.moving) {
+    const want = Math.atan2(mv.y, mv.x); me.a += clamp(angDiff(want, me.a), -12 * dt, 12 * dt);
+    const sp = CONFIG.speed * Math.min(1, len) * (1 - CONFIG.carrySlow * (me.carry / CONFIG.carryCap)) * (input.held() ? 0.8 : 1);
+    me.x += Math.cos(me.a) * sp * dt; me.y += Math.sin(me.a) * sp * dt;
+    collide(me);
+  }
+  const held = on && input.held() && !jumping;
+  me.raking = held && me.tool === 0;
+  if (me.raking) { if (rakeStep(me, dt, api)) me.rakedOnce = true; me.rustle = me.moving ? 1 : 0.4; } else me.rustle = 0;
+  if (held && me.tool === 1) blowStep(me, dt, api);
+  if (me.wasRaking && !me.raking && me.carry > 0 && on) dropMine(api);
+  me.wasRaking = me.raking;
+  if (world.acting) me.carry = world.carry[me.id] || 0;
+  rustleSound(me.rustle * (me.carry < CONFIG.carryCap ? 1 : 0.2) + (held && me.tool === 1 ? 1.4 : 0));
+  publish(now);
+}
+/** Let go of the rake: the armful lands at its head (on a pile close by, if there is one). */
+function dropMine(api) {
+  const h = headOf(me), n = Math.round(me.carry);
+  api.act(["d", Math.round(h.x * 10), Math.round(h.y * 10)]);
+  if (!world.acting) { pend.ghost = { x: h.x, y: h.y, n }; me.carry = 0; }
+  flick(h.x, h.y, 8); sfx("drop");
+}
+function bagMine() {
+  const g = day(), p = nearestPile(me, CONFIG.bagMin);
+  if (!g || g.ph !== "on" || !p) return;
+  (world.acting ? hostApi(me.id) : localApi).act(["b", p.id]);
+  if (!world.acting) { pend.hide.push(p.id); bagFx({ x: p.x, y: p.y, n: p.n, coins: Math.floor((p.n / CONFIG.leavesPerCoin) * (p.n >= CONFIG.bigBag ? 1.5 : 1)), by: me.id }); }
+}
+function jumpMine() {
+  const g = day(), p = nearestPile(me, CONFIG.jumpMin), now = performance.now();
+  if (!g || g.ph !== "on" || !p || (me.jumpAt && now - me.jumpAt < 900)) return;
+  me.jumpAt = now; me.jumpFrom = { x: me.x, y: me.y }; me.jumpTo = { x: p.x, y: p.y };
+  (world.acting ? hostApi(me.id) : localApi).act(["j", p.id]);
+  if (!world.acting) wheeFx({ x: p.x, y: p.y, n: p.n, by: me.id });
+}
+function toolMine() {
+  const g = day(); if (!g || g.ph !== "on") return;
+  if (scOf(g, me.id)[3]) { me.tool = 1 - me.tool; sfx("click"); return; }
+  if (scOf(g, me.id)[0] >= CONFIG.blowerCost) { (world.acting ? hostApi(me.id) : localApi).act(["u"]); me.tool = 1; toast("Leaf blower! Hold to blow leaves into a heap"); sfx("cash"); }
+  else toast(`The blower costs 🪙${CONFIG.blowerCost}: bag some piles first`);
+}
+function publish(now) {
+  if (now - me.lastSend < CONFIG.sendMs) return;
+  me.lastSend = now;
+  net.me.set("p", JSON.stringify({ x: +me.x.toFixed(2), y: +me.y.toFixed(2), a: +me.a.toFixed(2), l: Math.round(me.carry), r: me.raking ? 1 : 0, t: me.tool, w: me.moving ? 1 : 0, j: me.jumpAt && now - me.jumpAt < 700 ? 1 : 0, g: me.dayId }));
+}
+const botColors = () => (world.acting ? [...world.bots.values()].map((b) => b.color) : shared("bots", []).map((b) => b && b.c));
+/** Two people in one color (or a bot has mine): the one with the higher sessionId picks a color nobody wears. */
+function fixColor() {
+  const others = Object.entries(S.entities.players || {}).filter(([id]) => id !== net.sessionId);
+  if (!others.some(([id, p]) => p.c === me.color && id < net.sessionId) && !botColors().includes(me.color)) return;
+  const taken = new Set([...others.map(([, p]) => p.c), ...botColors()]), free = COLORS.find((c) => !taken.has(c));
+  if (free) { me.color = free; net.me.set("c", free); }
+}
+
+// ── OTHERS ──────────────────────────────────────────────────────────────────────────
+const views = new Map(); // id -> someone else's raker (a person, or a bot on a non-host screen), eased between snapshots
+function syncViews(now) {
+  const live = new Set(livePlayers()), seen = new Set();
+  const add = (id, d, name, color, bot) => {
+    if (!d || typeof d.x !== "number" || typeof d.y !== "number") return;
+    seen.add(id);
+    let v = views.get(id);
+    if (!v) { v = { id, bot, x: d.x, y: d.y, a: +d.a || 0, fx: d.x, fy: d.y, fa: +d.a || 0, tx: d.x, ty: d.y, ta: +d.a || 0, at: now, gap: 100 }; views.set(id, v); }
+    if (d.x !== v.tx || d.y !== v.ty || +d.a !== v.ta) { // a new snapshot: ease from where it's drawn now to it, over one snapshot gap
+      const jump = Math.hypot(d.x - v.x, d.y - v.y) > 6;
+      Object.assign(v, { fx: jump ? d.x : v.x, fy: jump ? d.y : v.y, fa: v.a, tx: d.x, ty: d.y, ta: +d.a || 0, gap: clamp(now - v.at, 60, 250), at: now });
+    }
+    if (d.j && !v.j) v.jumpAt = now;
+    Object.assign(v, { name, color, carry: +d.l || 0, raking: !!d.r, tool: +d.t || 0, moving: !!d.w, j: d.j });
+  };
+  for (const [id, p] of Object.entries(S.entities.players || {})) if (id !== net.sessionId && live.has(id)) add(id, parseOnce("p:" + id, p.p, null), String(p.n || "Player").slice(0, 24), p.c || "#9aa3b5", false);
+  if (!world.acting) for (const b of shared("bots", [])) if (b) add(b.i, b, b.n, b.c, true);
+  for (const id of views.keys()) if (!seen.has(id)) views.delete(id);
+  for (const v of views.values()) {
+    const k = Math.min(1, (now - v.at) / v.gap);
+    v.x = v.fx + (v.tx - v.fx) * k; v.y = v.fy + (v.ty - v.fy) * k; v.a = v.fa + angDiff(v.ta, v.fa) * k;
+    if (v.raking && Math.random() < 0.15) { const h = headOf(v); flick(h.x, h.y, 1); }
+  }
+}
+/** Everyone to draw and count: me, the others, and (on the host) its own bots. */
+function everyone() {
+  const out = [{ id: me.id, name: myName, color: me.color, x: me.x, y: me.y, a: me.a, carry: me.carry, raking: me.raking, tool: me.tool, moving: me.moving, jumpAt: me.jumpAt, mine: true }];
+  for (const v of views.values()) out.push({ id: v.id, name: v.name, color: v.color, x: v.x, y: v.y, a: v.a, carry: v.carry, raking: v.raking, tool: v.tool, moving: v.moving, jumpAt: v.jumpAt, bot: v.bot });
+  if (world.acting) for (const b of world.bots.values()) out.push({ id: b.id, name: b.name, color: b.color, x: b.x, y: b.y, a: b.a, carry: b.carry, raking: b.raking, tool: b.tool, moving: b.moving, jumpAt: b.jumpAt, bot: true });
+  return out;
+}
+
+// ── DRAW ────────────────────────────────────────────────────────────────────────────
+const cv = document.getElementById("game"), ctx = cv.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+function fit() { DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * DPR; cv.height = H * DPR; }
+addEventListener("resize", fit); addEventListener("orientationchange", fit); fit();
+const cam = { x: (NX * CELL) / 2, y: (NY * CELL) / 2, z: 1 };
+const canvasOf = (w, h) => Object.assign(document.createElement("canvas"), { width: w, height: h });
+function shade(hex, k) { const n = parseInt(hex.slice(1), 16) || 0; return `rgb(${(((n >> 16) & 255) * k) | 0},${(((n >> 8) & 255) * k) | 0},${((n & 255) * k) | 0})`; }
+/** The yard, painted once: lawn, path, house roof, fence, sidewalk, curb, the street, pumpkins. */
+function paintGround() {
+  const c = canvasOf(NX * CELL, NY * CELL), g = c.getContext("2d"), r = mulberry32(11);
+  for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++) { g.fillStyle = (x + y) % 2 ? "#8fae5a" : "#89a855"; g.fillRect(x * CELL, y * CELL, CELL, CELL); }
+  for (let k = 0; k < 2200; k++) { g.fillStyle = r() < 0.5 ? "#7d9a4a" : "#9cbb66"; g.fillRect(r() * NX * CELL, r() * NY * CELL, 2, 4); }
+  for (const t of TREES) { g.fillStyle = "rgba(40,50,20,.22)"; g.beginPath(); g.ellipse((t.x + 0.8) * CELL, (t.y + 0.9) * CELL, t.r * CELL * 0.95, t.r * CELL * 0.8, 0, 0, 7); g.fill(); }
+  for (let y = 5.6; y < 27.6; y += 1.25) { const x = 24 + Math.sin(y * 0.6) * 0.25; g.fillStyle = "#cfc6b4"; g.beginPath(); g.ellipse(x * CELL, y * CELL, 13, 9, 0, 0, 7); g.fill(); g.fillStyle = "#b8ae9a"; g.beginPath(); g.ellipse(x * CELL + 1, y * CELL + 2, 11, 6, 0, 0, Math.PI); g.fill(); }
+  g.fillStyle = "#d8d3c8"; g.fillRect(0, 27.8 * CELL, NX * CELL, 0.8 * CELL); g.fillStyle = "#bdb6a6"; for (let x = 0; x < NX; x += 2) g.fillRect(x * CELL, 27.8 * CELL, 1, 0.8 * CELL); // sidewalk
+  g.fillStyle = "#a9a294"; g.fillRect(0, CURB_Y * CELL - 2, NX * CELL, 5); g.fillStyle = "#4d525d"; g.fillRect(0, CURB_Y * CELL + 3, NX * CELL, NY * CELL); // curb, street
+  // the house: a roof from above with shingles, a chimney, a porch and steps
+  const hx = HOUSE.x0 * CELL, hw = (HOUSE.x1 - HOUSE.x0) * CELL, hy = HOUSE.y1 * CELL;
+  g.fillStyle = "rgba(30,20,10,.3)"; g.fillRect(hx + 8, 0, hw, hy + 8);
+  g.fillStyle = "#7a3b2e"; g.fillRect(hx, 0, hw, hy); g.fillStyle = "#8f4a3a"; g.fillRect(hx, 0, hw, hy / 2);
+  for (let y = 4; y < hy; y += 7) { g.fillStyle = "#6a3226"; g.fillRect(hx, y, hw, 1.5); }
+  g.fillStyle = "#a65a46"; g.fillRect(hx, hy / 2 - 2, hw, 4);
+  g.fillStyle = "#5e3a2e"; g.fillRect(hx + hw * 0.78, 10, 26, 22); g.fillStyle = "#3b2a22"; g.fillRect(hx + hw * 0.78 + 5, 15, 16, 12);
+  g.fillStyle = "#e9dcc3"; g.fillRect(21 * CELL, hy - 2, 6 * CELL, 18); g.fillStyle = "#c9b99a"; for (let k = 0; k < 3; k++) g.fillRect(22.5 * CELL, hy + 16 + k * 6, 3 * CELL, 5);
+  // pumpkins by the porch and in the corner
+  for (const [x, y, s] of [[20, 6.6, 1], [28.3, 6.4, 0.8], [43.5, 25.2, 1.2], [45, 24, 0.9], [44.2, 26.3, 0.8], [3, 25.8, 1]]) {
+    g.fillStyle = "#e0701b"; for (const o of [-6, 0, 6]) { g.beginPath(); g.ellipse(x * CELL + o * s, y * CELL, 8 * s, 10 * s, 0, 0, 7); g.fill(); }
+    g.fillStyle = "#c45a10"; g.fillRect(x * CELL - 1, y * CELL - 9 * s, 2, 16 * s); g.fillStyle = "#4a7a2a"; g.fillRect(x * CELL - 2, y * CELL - 13 * s, 4, 5 * s);
+  }
+  // the picket fence round the yard
+  g.fillStyle = "rgba(30,20,10,.2)"; g.fillRect(0, 0.9 * CELL, 0.9 * CELL, 27 * CELL); g.fillRect(NX * CELL - 0.7 * CELL, 0.9 * CELL, 0.9 * CELL, 27 * CELL);
+  g.fillStyle = "#f4efe4";
+  for (let y = 0.6; y < 27.6; y += 0.7) { g.fillRect(0.2 * CELL, y * CELL, 0.45 * CELL, 0.5 * CELL); g.fillRect(NX * CELL - 0.65 * CELL, y * CELL, 0.45 * CELL, 0.5 * CELL); }
+  for (let x = 0.4; x < NX; x += 0.7) if (x < HOUSE.x0 || x > HOUSE.x1) g.fillRect(x * CELL, 0.2 * CELL, 0.5 * CELL, 0.45 * CELL);
+  g.fillStyle = "#dcd4c4"; g.fillRect(0.35 * CELL, 0, 3, 27.6 * CELL); g.fillRect(NX * CELL - 0.5 * CELL, 0, 3, 27.6 * CELL);
+  return c;
+}
+const groundCv = paintGround();
+// Leaf sprites: six colors, eight angles, drawn once at twice the size.
+const LS = 2; // the leaf layer's pixels per world pixel
+const sprites = [];
+for (const color of LEAF) for (let k = 0; k < 8; k++) {
+  const c = canvasOf(22, 22), g = c.getContext("2d"); g.translate(11, 11); g.rotate((k / 8) * Math.PI * 2);
+  g.fillStyle = color; g.beginPath(); g.moveTo(-9, 0); g.quadraticCurveTo(-1, -7.5, 9, 0); g.quadraticCurveTo(-1, 7.5, -9, 0); g.fill();
+  g.strokeStyle = shade(color, 0.65); g.lineWidth = 1.2; g.beginPath(); g.moveTo(-10, 0); g.lineTo(8, 0); g.stroke();
+  sprites.push(c);
+}
+// The leaf layer: every cell's leaves, in tiles of 6×5 cells. A tile is repainted only when a
+// count in it changed; leaves spill a little over their cell's edge, so neighbors are drawn too.
+const leafCv = canvasOf(NX * CELL * LS, NY * CELL * LS), lg = leafCv.getContext("2d");
+const shownN = new Int16Array(N).fill(-1), TW = 6, TH = 5, dirtyTiles = new Set();
+function paintTile(t) {
+  const tx = (t % (NX / TW)) * TW, ty = Math.floor(t / (NX / TW)) * TH, s = CELL * LS;
+  lg.save(); lg.beginPath(); lg.rect(tx * s, ty * s, TW * s, TH * s); lg.clip(); lg.clearRect(tx * s, ty * s, TW * s, TH * s);
+  for (let pass = 0; pass < 2; pass++) for (let y = ty - 1; y <= ty + TH; y++) for (let x = tx - 1; x <= tx + TW; x++) {
+    if (x < 0 || y < 0 || x >= NX || y >= NY) continue;
+    const i = idx(x, y), n = shownN[i]; if (n <= 0) continue;
+    const r = mulberry32(i * 31 + 7), X = x * s, Y = y * s;
+    if (pass === 0) { if (n > 3) { lg.fillStyle = `rgba(176,84,28,${Math.min(0.6, (n - 3) / 26)})`; lg.beginPath(); lg.arc(X + s / 2 + (r() - 0.5) * 10, Y + s / 2 + (r() - 0.5) * 10, s * 0.68, 0, 7); lg.fill(); } continue; }
+    for (let j = 0, k = Math.min(n, 12); j < k; j++) { const sp = sprites[Math.floor(r() * sprites.length)]; lg.drawImage(sp, X - 9 + r() * (s - 4), Y - 9 + r() * (s - 4)); }
+  }
+  lg.restore();
+}
+function repaintLeaves() {
+  for (let i = 0; i < N; i++) {
+    const n = open[i] ? Math.round(leavesAt(i)) : 0;
+    if (n === shownN[i]) continue;
+    shownN[i] = n;
+    const x = i % NX, y = Math.floor(i / NX);
+    for (const [dx, dy] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]]) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < NX && yy < NY) dirtyTiles.add(Math.floor(yy / TH) * (NX / TW) + Math.floor(xx / TW)); }
+  }
+  for (const t of dirtyTiles) paintTile(t);
+  dirtyTiles.clear();
+}
+// A pile: a dome of leaves, painted once per size (cached by pile id and size).
+const pileCache = new Map();
+function pileCanvas(id, n) {
+  const bucket = Math.round(Math.sqrt(n) * 2), key = id + ":" + bucket;
+  if (pileCache.has(key)) return pileCache.get(key);
+  if (pileCache.size > 200) pileCache.clear();
+  const R = pileR(n) * CELL, c = canvasOf(Math.ceil(R * 2 + 24), Math.ceil(R * 2 + 24)), g = c.getContext("2d"), cx = c.width / 2, cy = c.height / 2, r = mulberry32((typeof id === "number" ? id : 999) * 7 + 1);
+  const grad = g.createRadialGradient(cx - R * 0.3, cy - R * 0.4, R * 0.1, cx, cy, R);
+  grad.addColorStop(0, "#f3a712"); grad.addColorStop(0.6, "#d2691e"); grad.addColorStop(1, "#8a3b12");
+  g.fillStyle = grad; g.beginPath(); g.ellipse(cx, cy, R, R * 0.92, 0, 0, 7); g.fill();
+  const count = Math.min(90, 14 + n / 4);
+  for (let k = 0; k < count; k++) { const a = r() * 6.28, d = Math.sqrt(r()) * R * 0.95, sp = sprites[Math.floor(r() * sprites.length)], z = 0.8 + (1 - d / R) * 0.5; g.drawImage(sp, cx + Math.cos(a) * d - 9 * z, cy + Math.sin(a) * d * 0.92 - 9 * z, 18 * z, 18 * z); }
+  pileCache.set(key, { c, R });
+  return pileCache.get(key);
+}
+// Particles: flicked leaves, falling leaves, jump bursts, coins, wind streaks.
+const parts = [], floats = [];
+function particle(p) { if (parts.length < 900) parts.push(p); }
+function flick(x, y, n) { for (let k = 0; k < n; k++) particle({ x, y, z: 0.2, vx: rnd(-1.5, 1.5), vy: rnd(-1.5, 1.5), vz: rnd(2, 4), g: 9, life: rnd(0.4, 0.8), sp: pick(sprites), s: rnd(0.6, 1) }); }
+function burst(x, y, n) { for (let k = 0; k < n; k++) { const a = rnd(0, 6.28), v = rnd(2, 7); particle({ x, y, z: rnd(0, 0.6), vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.8, vz: rnd(4, 10), g: 7, life: rnd(1, 1.8), sp: pick(sprites), s: rnd(0.8, 1.4), drift: 1 }); } }
+function windFx(x, y, dx, dy) { particle({ x, y, z: 0.3, vx: dx * 6, vy: dy * 6, vz: 0.5, g: 1, life: 0.35, streak: 1 }); }
+function floatText(text, x, y, color) { floats.push({ text, x, y, color, life: 1.6 }); }
+let wheeCount = 0, bagCount = 0; // effects shown on this screen (read in tests)
+function bagFx(m) { bagCount++; burst(m.x, m.y, 12); floatText(`+🪙${m.coins}`, m.x, m.y - 1.2, "#ffe066"); if (m.by === me.id) { sfx("cash"); toast(m.n >= CONFIG.bigBag ? `Big bag! +🪙${m.coins}` : `Bagged ${m.n} leaves · +🪙${m.coins}`); } }
+function wheeFx(m) { wheeCount++; burst(m.x, m.y, Math.min(140, 30 + m.n / 2)); floatText(`WHEEE! ${m.n}`, m.x, m.y - 1.6, "#fff"); if (m.by === me.id) sfx("whee"); else if (Math.hypot(m.x - me.x, m.y - me.y) < 14) sfx("rustle"); }
+/** Falling leaves under the crowns while a wave comes down (just for looks: the host adds the real ones). */
+function fallFx(g, t, dt) {
+  if (!g || g.ph !== "on" || t < g.wave[1] || t > g.wave[1] + CONFIG.waveLen) return;
+  for (let k = 0; k < dt * 70; k++) { const tr = pick(TREES), a = rnd(0, 6.28), d = Math.sqrt(Math.random()) * tr.r; particle({ x: tr.x + Math.cos(a) * d, y: tr.y + Math.sin(a) * d, z: rnd(3, 5), vx: rnd(-0.6, 0.6), vy: rnd(-0.3, 0.6), vz: -1.2, g: 0, life: 3, sp: pick(sprites), s: rnd(0.7, 1.1), sway: rnd(0, 6) }); }
+}
+function gustFx(g, t, dt) {
+  if (!g || g.ph !== "on") return;
+  const [gt, dx] = g.gust;
+  if (t < gt || t > gt + CONFIG.gustLen) return;
+  const vx0 = cam.x / CELL - W / 2 / cam.z / CELL, vy0 = cam.y / CELL - H / 2 / cam.z / CELL;
+  for (let k = 0; k < dt * 40; k++) particle({ x: vx0 + rnd(0, W / cam.z / CELL), y: vy0 + rnd(0, H / cam.z / CELL), z: rnd(0.5, 3), vx: dx * rnd(14, 22), vy: rnd(-1, 1), vz: 0, g: 0, life: 0.5, streak: 1 });
+  for (let k = 0; k < dt * 30; k++) particle({ x: vx0 + rnd(0, W / cam.z / CELL), y: vy0 + rnd(0, H / cam.z / CELL), z: rnd(0.2, 1.5), vx: dx * rnd(6, 10), vy: rnd(-1, 1), vz: rnd(0, 2), g: 3, life: 1, sp: pick(sprites), s: 0.8 });
+}
+function partsTick(dt) {
+  for (let k = parts.length - 1; k >= 0; k--) {
+    const p = parts[k]; p.life -= dt; if (p.life <= 0) { parts.splice(k, 1); continue; }
+    p.vz -= p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z = Math.max(0, p.z + p.vz * dt);
+    if (p.sway !== undefined) p.x += Math.sin(p.life * 4 + p.sway) * dt * 1.2;
+    if (p.drift) { p.vx *= 1 - dt * 1.5; p.vy *= 1 - dt * 1.5; }
+    if (p.z <= 0 && !p.streak) { p.vx *= 0.8; p.vy *= 0.8; }
+  }
+  for (let k = floats.length - 1; k >= 0; k--) { floats[k].life -= dt; floats[k].y -= dt * 1.1; if (floats[k].life <= 0) floats.splice(k, 1); }
+}
+/** One raker from above: body, head, beanie, scarf, the rake (or blower) and the armful of leaves. */
+function drawRaker(r, now) {
+  const jt = r.jumpAt ? (now - r.jumpAt) / 700 : 1, hop = jt < 1 ? Math.sin(jt * Math.PI) : 0;
+  const x = r.x * CELL, y = r.y * CELL - hop * 26, s = 1 + hop * 0.35, ca = Math.cos(r.a), sa = Math.sin(r.a);
+  ctx.fillStyle = "rgba(40,30,10,.25)"; ctx.beginPath(); ctx.ellipse(r.x * CELL, r.y * CELL + 4, 10 * (1 - hop * 0.3), 6 * (1 - hop * 0.3), 0, 0, 7); ctx.fill();
+  ctx.save(); ctx.translate(x, y); ctx.scale(s * 1.3, s * 1.3);
+  const bob = r.moving ? Math.sin(now / 90) * 1.5 : 0;
+  if (r.tool === 1) { // the blower
+    ctx.fillStyle = "#f3a712"; ctx.save(); ctx.rotate(r.a); ctx.fillRect(4, 4, 12, 7); ctx.fillStyle = "#3b3b3b"; ctx.fillRect(14, 5, 12, 4); ctx.restore();
+  } else { // the rake: a handle and a fan of tines at its head
+    const hx = ca * CONFIG.rakeAhead * CELL, hy = sa * CONFIG.rakeAhead * CELL, wob = r.raking ? Math.sin(now / 60) * 2 : 0;
+    ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(ca * 4, sa * 4); ctx.lineTo(hx + wob * -sa, hy + wob * ca); ctx.stroke();
+    ctx.strokeStyle = "#6b6f78"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(hx - sa * 10, hy + ca * 10); ctx.quadraticCurveTo(hx + ca * 4, hy + sa * 4, hx + sa * 10, hy - ca * 10); ctx.stroke();
+  }
+  ctx.fillStyle = r.color; ctx.beginPath(); ctx.ellipse(0, bob * 0.3, 9, 8, r.a, 0, 7); ctx.fill(); // coat
+  ctx.fillStyle = "#f2c9a0"; ctx.beginPath(); ctx.arc(0, -1 + bob * 0.3, 5.5, 0, 7); ctx.fill();
+  ctx.fillStyle = shade(r.color, 0.7); ctx.beginPath(); ctx.arc(0, -2 + bob * 0.3, 5.6, Math.PI * 1.05, Math.PI * 1.95); ctx.fill(); // beanie
+  ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(0, -7 + bob * 0.3, 2, 0, 7); ctx.fill();
+  if (r.carry > 1) { const R = 4 + Math.sqrt(r.carry) * 0.9, ax = ca * 9, ay = sa * 9; const pc = pileCanvas("arm", Math.max(8, r.carry * 0.6)); ctx.drawImage(pc.c, ax - R, ay - R * 0.9, R * 2, R * 1.8); }
+  ctx.restore();
+}
+// The tree crowns over everything, painted on their own layer with a soft see-through hole
+// around anyone (and any pile) underneath, so nobody hides under a tree.
+const crownCv = canvasOf(1, 1), crownG = crownCv.getContext("2d");
+function drawCanopies(now, things) {
+  if (crownCv.width !== cv.width || crownCv.height !== cv.height) { crownCv.width = cv.width; crownCv.height = cv.height; }
+  const g = crownG;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, crownCv.width, crownCv.height);
+  g.setTransform(ctx.getTransform());
+  for (const t of TREES) {
+    const x = t.x * CELL, y = t.y * CELL, R = t.r * CELL, r = mulberry32(Math.round(t.x * 13));
+    for (let k = 0; k < 9; k++) {
+      const a = (k / 9) * 6.28 + r(), d = R * (0.35 + r() * 0.35), rr = R * (0.38 + r() * 0.2), sway = Math.sin(now / 900 + k) * 2;
+      g.fillStyle = ["#c9541e", "#e07a1f", "#b5361d", "#e8a33a", "#d1612a"][k % 5];
+      g.beginPath(); g.arc(x + Math.cos(a) * d + sway, y + Math.sin(a) * d, rr, 0, 7); g.fill();
+    }
+    g.fillStyle = "#f2b84b"; g.beginPath(); g.arc(x - R * 0.2, y - R * 0.25, R * 0.35, 0, 7); g.fill();
+  }
+  g.globalCompositeOperation = "destination-out";
+  for (const o of things) {
+    const q = o.p || o.r, X = q.x * CELL, Y = q.y * CELL, hole = (o.p ? pileR(o.p.n) + 1 : 1.8) * CELL;
+    if (!TREES.some((t) => Math.hypot(q.x - t.x, q.y - t.y) < t.r + hole / CELL)) continue;
+    const grad = g.createRadialGradient(X, Y, hole * 0.45, X, Y, hole);
+    grad.addColorStop(0, "rgba(0,0,0,.85)"); grad.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = grad; g.beginPath(); g.arc(X, Y, hole, 0, 7); g.fill();
+  }
+  g.globalCompositeOperation = "source-over";
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 0.93; ctx.drawImage(crownCv, 0, 0); ctx.restore();
+}
+/** Where the camera looks: the whole yard if it fits, else following me (stopping at the edges). */
+function placeCamera(dt) {
+  if (ATTRACT) { cam.z = Math.max(1.5, H / 330); const k = 1 - Math.pow(0.05, dt); cam.x += (clamp(me.x * CELL, W / 2 / cam.z, NX * CELL - W / 2 / cam.z) - cam.x) * k; cam.y += (clamp(me.y * CELL, H / 2 / cam.z, NY * CELL - H / 2 / cam.z) - cam.y) * k; return; } // the preview: close up on my pile
+  const fitZ = Math.min(W / (NX * CELL), H / ((NY - 0.8) * CELL)), z = fitZ * CELL >= 15 ? fitZ : Math.min(1.6, Math.max(15 / CELL, H / ((NY + 1) * CELL))); // too small to see? follow me, filling the screen's height
+  cam.z = z;
+  const vw = W / z, vh = H / z, wx = NX * CELL, wy = NY * CELL;
+  const tx = vw >= wx ? wx / 2 : clamp(me.x * CELL, vw / 2, wx - vw / 2), ty = vh >= wy ? wy / 2 - 8 : clamp(me.y * CELL, vh / 2, wy - vh / 2);
+  const k = 1 - Math.pow(0.002, dt); cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k;
+}
+function draw(dt, now) {
+  placeCamera(dt);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = "#4d525d"; ctx.fillRect(0, 0, W, H);
+  ctx.setTransform(DPR * cam.z, 0, 0, DPR * cam.z, DPR * (W / 2 - cam.x * cam.z), DPR * (H / 2 - cam.y * cam.z));
+  ctx.drawImage(groundCv, 0, 0);
+  repaintLeaves(); ctx.drawImage(leafCv, 0, 0, NX * CELL, NY * CELL);
+  const g = day();
+  for (let k = 0; k < Math.min(36, (g && g.bagsN) || 0); k++) { // full bags waiting at the curb
+    const x = (1.4 + (k % 36) * 1.3) * CELL, y = (CURB_Y - 0.25) * CELL;
+    ctx.fillStyle = "#c8a46e"; ctx.fillRect(x - 7, y - 16, 14, 16); ctx.fillStyle = "#a8844e"; ctx.fillRect(x - 7, y - 16, 14, 3); ctx.fillStyle = "#e4572e"; ctx.fillRect(x - 4, y - 19, 8, 4);
+  }
+  // piles and rakers, back to front
+  const things = [...pilesNow().map((p) => ({ y: p.y, p })), ...everyone().map((r) => ({ y: r.y + 0.3, r }))].sort((a, b) => a.y - b.y);
+  const target = !ATTRACT && nearestPile(me, CONFIG.bagMin);
+  for (const t of things) {
+    if (t.p) {
+      const { c, R } = pileCanvas(t.p.id, t.p.n), x = t.p.x * CELL, y = t.p.y * CELL;
+      ctx.fillStyle = "rgba(40,30,10,.28)"; ctx.beginPath(); ctx.ellipse(x + 3, y + R * 0.35, R * 1.05, R * 0.6, 0, 0, 7); ctx.fill();
+      ctx.drawImage(c, x - c.width / 2, y - c.height / 2 - R * 0.2);
+      if (target && target.id === t.p.id) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.ellipse(x, y, R + 6, R * 0.95 + 6, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+      if (t.p.n >= CONFIG.bagMin && !ATTRACT) { ctx.font = "800 11px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.fillStyle = "#fff"; ctx.strokeStyle = "#3b2414"; ctx.lineWidth = 3; ctx.strokeText(`${t.p.n}`, x, y - R - 6); ctx.fillText(`${t.p.n}`, x, y - R - 6); }
+    } else drawRaker(t.r, now);
+  }
+  // falling and flying leaves, wind streaks
+  for (const p of parts) {
+    const x = p.x * CELL, y = (p.y - p.z * 0.6) * CELL;
+    if (p.streak) { ctx.strokeStyle = `rgba(255,255,255,${0.5 * Math.min(1, p.life * 3)})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - p.vx * 2.2, y - p.vy * 2.2); ctx.stroke(); continue; }
+    const sz = 16 * p.s; ctx.globalAlpha = Math.min(1, p.life * 3); ctx.drawImage(p.sp, x - sz / 2, y - sz / 2, sz, sz); ctx.globalAlpha = 1;
+  }
+  drawCanopies(now, things);
+  // names (not mine), floating text
+  ctx.textAlign = "center"; ctx.font = "700 10px system-ui, sans-serif";
+  for (const r of everyone()) if (!r.mine && !ATTRACT) { ctx.fillStyle = "#fff"; ctx.strokeStyle = "#3b2414aa"; ctx.lineWidth = 3; ctx.strokeText(r.name, r.x * CELL, r.y * CELL - 16); ctx.fillText(r.name, r.x * CELL, r.y * CELL - 16); }
+  ctx.font = "900 16px system-ui, sans-serif";
+  for (const f of floats) { ctx.globalAlpha = Math.min(1, f.life * 2); ctx.fillStyle = f.color; ctx.strokeStyle = "#3b2414"; ctx.lineWidth = 4; ctx.strokeText(f.text, f.x * CELL, f.y * CELL); ctx.fillText(f.text, f.x * CELL, f.y * CELL); ctx.globalAlpha = 1; }
+}
+
+// ── HUD & RESULTS ───────────────────────────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+let board = null, netDown = false, toastUntil = 0, overDismissed = -1, shownOver = -1;
+function toast(text) { if (ATTRACT) return; $("toast").textContent = text; $("toast").style.opacity = 1; toastUntil = performance.now() + 2200; }
+const watch = { wave: -1, gust: 0, day: -1 };
+/** What changed since the last frame: a wave starting, a gust coming. */
+function watchDay(now) {
+  const g = day(); if (!g) return;
+  const t = Date.now();
+  if (g.wave[1] <= t && watch.wave !== g.wave[0] + ":" + g.id) { const first = watch.wave === -1; watch.wave = g.wave[0] + ":" + g.id; if (!first && g.ph === "on") { toast("🍂 The trees are shedding! More leaves coming down"); sfx("wave"); } }
+  if (g.gust[0] - t < CONFIG.gustWarn && g.gust[0] - t > 0 && watch.gust !== g.gust[0] && g.ph === "on") { watch.gust = g.gust[0]; toast(`💨 Gust coming ${g.gust[1] > 0 ? "→" : "←"} bag the small piles!`); sfx("gust"); }
+}
+function hud(now) {
+  if (ATTRACT) { $("net").textContent = ""; return; }
+  const g = day(), t = Date.now(), n = livePlayers().length;
+  $("net").textContent = netDown ? "Reconnecting…" : net.offline ? "Offline: playing with bots" : `Online · ${n} player${n === 1 ? "" : "s"}${isHost() ? " · you run the yard" : ""}`;
+  if (g) {
+    const s = Math.max(0, Math.ceil((g.ends - t) / 1000));
+    $("day").textContent = `Afternoon ${g.id}`;
+    $("clock").textContent = g.ph === "on" ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} to sundown` : `Next in ${s}s`; $("clock").className = g.ph === "on" && s <= 15 ? "hurry" : "";
+    const mine = scOf(g, me.id);
+    $("coins").textContent = `🪙 ${mine[0]}`;
+    const gt = g.gust[0] - t;
+    $("banner").textContent = g.ph !== "on" ? "" : gt > 0 && gt < CONFIG.gustWarn ? `💨 Gust in ${Math.ceil(gt / 1000)}s ${g.gust[1] > 0 ? "→" : "←"}` : gt <= 0 && gt > -CONFIG.gustLen ? "💨 WIND!" : t >= g.wave[1] && t < g.wave[1] + CONFIG.waveLen ? "🍂 Leaves falling!" : "";
+    if (g.ph === "end" && shownOver !== g.id) showOver(g);
+    $("over").hidden = g.ph !== "end" || overDismissed === g.id;
+    if (g.ph === "end") $("next").textContent = `Next afternoon in ${s}s`;
+    // touch buttons for what you can do right here
+    const bagP = nearestPile(me, CONFIG.bagMin), jumpP = nearestPile(me, CONFIG.jumpMin);
+    $("bagBtn").hidden = !touchUI || !bagP; $("jumpBtn").hidden = !touchUI || !jumpP;
+    $("toolBtn").hidden = !touchUI || (!mine[3] && mine[0] < CONFIG.blowerCost);
+    $("toolBtn").textContent = mine[3] ? (me.tool ? "RAKE" : "BLOWER") : `BLOWER 🪙${CONFIG.blowerCost}`;
+    $("rakeBtn").textContent = me.tool ? "BLOW" : "RAKE";
+  }
+  const c = Math.round(me.carry);
+  $("armFill").style.width = `${Math.min(100, (100 * c) / CONFIG.carryCap)}%`;
+  $("armTxt").textContent = c >= CONFIG.carryCap ? `Arms full (${c}): let go to drop` : c ? `Armful: ${c} leaves` : me.tool ? "Leaf blower" : "Rake leaves into a pile";
+  const rows = g ? everyone().map((r) => ({ ...r, coins: scOf(g, r.id)[0] })).sort((a, b) => b.coins - a.coins).slice(0, 6) : [];
+  $("crew").innerHTML = rows.map((r) => `<div class="${r.mine ? "me" : ""}"><i style="background:${r.color}"></i><span>${esc(r.mine ? "You" : r.name)}</span><b>🪙${r.coins}</b></div>`).join("");
+  if (now > toastUntil) $("toast").style.opacity = 0;
+  const showHint = now - me.startedAt < 18000 && $("over").hidden;
+  $("hint").style.opacity = showHint ? 1 : 0;
+  if (showHint) $("hint").innerHTML = `<span>Rake leaves into a pile, then bag it for coins<small>${touchUI ? "Drag to walk · hold RAKE, let go to drop · BAG and JUMP by a pile" : "Hold the mouse to walk there and rake (or WASD + hold Space), let go to drop · E bags · Q jumps in · B blower"}</small></span>`;
+}
+function showOver(g) {
+  shownOver = g.id;
+  const mine = (g.res || []).find((r) => r.id === me.id) || { coins: 0, bags: 0, jump: 0 };
+  $("overTitle").textContent = "Sundown!"; $("overSub").textContent = `${g.bagsN || 0} bags at the curb this afternoon`;
+  $("stCoins").textContent = mine.coins; $("stBags").textContent = mine.bags; $("stJump").textContent = mine.jump ? `${mine.jump} 🍂` : "–";
+  $("crewList").innerHTML = (g.res || []).map((r) => `<li class="${r.id === me.id ? "me" : ""}"><i style="background:${esc(r.c)}"></i>${esc(r.id === me.id ? "You" : r.n)}<span>🪙${r.coins}</span></li>`).join("");
+  const list = $("board");
+  if (!board) { list.innerHTML = "<li>Leaderboards need a connection.</li>"; return; }
+  list.innerHTML = "<li>Loading…</li>";
+  (mine.coins > 0 ? board.submit(mine.coins).catch(() => null) : Promise.resolve()).then(() => board.top(10)).then(({ entries }) => {
+    list.innerHTML = entries.length ? entries.map((e) => `<li>${esc(e.username || "Player")}<span>🪙${e.score}</span></li>`).join("") : "<li>No afternoons yet. Set the first!</li>";
+  }).catch(() => { list.innerHTML = "<li>Couldn't load the leaderboard.</li>"; });
+}
+$("again").onclick = () => { overDismissed = day()?.id ?? -1; };
+// Sound: a rustle while raking (noise through a filter), and little blips. Started by the first key or tap.
+let audio = null, rustle = null;
+function unlockAudio() {
+  if (ATTRACT) return;
+  if (!audio) { try { audio = new AudioContext(); } catch { return; } }
+  if (audio.state === "suspended") audio.resume();
+  if (!rustle) {
+    const buf = audio.createBuffer(1, audio.sampleRate, audio.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (Math.random() < 0.3 ? 1 : 0.3);
+    const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
+    src.buffer = buf; src.loop = true; f.type = "bandpass"; f.frequency.value = 2400; f.Q.value = 0.7; g.gain.value = 0;
+    src.connect(f).connect(g).connect(audio.destination); src.start(); rustle = { f, g };
+  }
+}
+function rustleSound(k) { if (!rustle) return; const t = audio.currentTime; rustle.g.gain.setTargetAtTime(Math.min(0.08, k * 0.045), t, 0.05); rustle.f.frequency.setTargetAtTime(k > 1 ? 900 : 2400, t, 0.1); }
+function tone(freq, dur, type = "triangle", vol = 0.05, slideTo = 0, delay = 0) {
+  if (!audio || ATTRACT) return;
+  try { const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + delay; o.type = type; o.frequency.setValueAtTime(freq, t); if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(g).connect(audio.destination); o.start(t); o.stop(t + dur); } catch {}
+}
+function sfx(k) {
+  if (k === "cash") { tone(1320, 0.08, "square", 0.04); tone(1760, 0.16, "square", 0.04, 0, 0.08); }
+  else if (k === "drop") tone(220, 0.15, "sine", 0.06, 120);
+  else if (k === "whee") { tone(300, 0.35, "triangle", 0.06, 900); tone(200, 0.3, "sine", 0.05, 80, 0.32); }
+  else if (k === "wave") [660, 550, 440].forEach((f, i) => tone(f, 0.18, "triangle", 0.04, 0, i * 0.12));
+  else if (k === "gust") tone(180, 0.6, "sawtooth", 0.025, 90);
+  else if (k === "click") tone(800, 0.05, "square", 0.03);
+  else if (k === "rustle") tone(500, 0.1, "triangle", 0.02, 300);
+}
+
+// ── INPUT ───────────────────────────────────────────────────────────────────────────
+const touchUI = matchMedia("(pointer: coarse)").matches && !ATTRACT;
+const input = { keys: new Set(), space: false, mouse: null, stick: null, rakeBtn: false, held: () => input.space || input.rakeBtn || !!(input.mouse && input.mouse.down) };
+const KEYMAP = { arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0], arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1] };
+/** A point on screen to a cell position, through the camera that drew the frame. */
+const screenToWorld = (sx, sy) => ({ x: (cam.x + (sx - W / 2) / cam.z) / CELL, y: (cam.y + (sy - H / 2) / cam.z) / CELL });
+function moveInput() {
+  if (input.stick && input.stick.on) return { x: input.stick.dx, y: input.stick.dy };
+  let x = 0, y = 0;
+  for (const k of input.keys) { x += KEYMAP[k][0]; y += KEYMAP[k][1]; }
+  if (!x && !y && input.mouse && input.mouse.down) { const p = screenToWorld(input.mouse.x, input.mouse.y), dx = p.x - me.x, dy = p.y - me.y, d = Math.hypot(dx, dy); if (d > 0.5) return { x: dx / d, y: dy / d }; }
+  const l = Math.hypot(x, y);
+  return l > 1 ? { x: x / l, y: y / l } : { x, y };
+}
+addEventListener("keydown", (e) => {
+  unlockAudio();
+  const k = e.key.toLowerCase();
+  if (KEYMAP[k]) { input.keys.add(k); e.preventDefault(); }
+  else if (k === " ") { e.preventDefault(); input.space = true; }
+  else if (k === "e" && !e.repeat) bagMine();
+  else if ((k === "q" || k === "j") && !e.repeat) jumpMine();
+  else if (k === "b" && !e.repeat) toolMine();
+});
+addEventListener("keyup", (e) => { const k = e.key.toLowerCase(); input.keys.delete(k); if (k === " ") input.space = false; });
+addEventListener("blur", () => { input.keys.clear(); input.space = false; input.rakeBtn = false; if (input.mouse) input.mouse.down = false; input.stick = null; });
+cv.addEventListener("contextmenu", (e) => e.preventDefault());
+cv.addEventListener("pointerdown", (e) => {
+  e.preventDefault(); unlockAudio();
+  if (e.pointerType === "mouse") { if (e.button === 2) { bagMine(); return; } input.mouse = { x: e.clientX, y: e.clientY, down: true }; return; }
+  if (!input.stick) { input.stick = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, on: false, dx: 0, dy: 0 }; try { cv.setPointerCapture(e.pointerId); } catch {} }
+});
+cv.addEventListener("pointermove", (e) => {
+  if (e.pointerType === "mouse") { input.mouse = { x: e.clientX, y: e.clientY, down: !!(input.mouse && input.mouse.down) }; return; }
+  const s = input.stick;
+  if (!s || s.id !== e.pointerId) return;
+  s.x = e.clientX; s.y = e.clientY;
+  let dx = s.x - s.x0, dy = s.y - s.y0, d = Math.hypot(dx, dy);
+  if (d > 10) s.on = true;
+  if (d > 56) { s.x0 = s.x - (dx / d) * 56; s.y0 = s.y - (dy / d) * 56; dx = s.x - s.x0; dy = s.y - s.y0; d = 56; } // the stick's base follows a long drag
+  const k = Math.min(1, d / 46);
+  s.dx = d ? (dx / d) * k : 0; s.dy = d ? (dy / d) * k : 0;
+});
+for (const ev of ["pointerup", "pointercancel"]) addEventListener(ev, (e) => { if (e.pointerType === "mouse" && input.mouse) input.mouse.down = false; if (input.stick && input.stick.id === e.pointerId) input.stick = null; });
+const rakeBtn = $("rakeBtn");
+rakeBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); unlockAudio(); input.rakeBtn = true; rakeBtn.classList.add("on"); try { rakeBtn.setPointerCapture(e.pointerId); } catch {} });
+for (const ev of ["pointerup", "pointercancel"]) rakeBtn.addEventListener(ev, () => { input.rakeBtn = false; rakeBtn.classList.remove("on"); });
+for (const [id, act] of [["bagBtn", bagMine], ["jumpBtn", jumpMine], ["toolBtn", toolMine]]) $(id).addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); unlockAudio(); act(); });
+rakeBtn.hidden = !touchUI;
+document.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
+if (ATTRACT) document.body.classList.add("attract");
+if (touchUI) document.body.classList.add("touch");
+
+// ── MAIN LOOP ───────────────────────────────────────────────────────────────────────
+let last = performance.now(), lastHb = 0, lastHud = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const realNow = performance.now(); // timed on the real clock: after a long freeze the rAF time can be from before the wake
+  if (lastFrameAt && realNow - lastFrameAt > 1000) { wakeHold = realNow + 700; world.acting = false; world.lastDay = null; } // woke from a freeze or a background tab: let the newer state arrive, then adopt it like a new host
+  lastFrameAt = realNow;
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now; // the first frame can be stamped before `last`
+  if (now - lastHb > 1000) { lastHb = now; net.me.set("hb", Date.now()); fixColor(); }
+  readChunks(); readAck();
+  if (isHost()) hostTick(dt, now); else world.acting = false;
+  syncViews(now);
+  myTick(dt, now);
+  sendActs(now); resendActs(now);
+  const g = day(), t = Date.now();
+  fallFx(g, t, dt); gustFx(g, t, dt); partsTick(dt);
+  watchDay(now);
+  if (now - lastHud > 150) { lastHud = now; hud(now); }
+  draw(dt, now);
+}
+
+(async function start() {
+  net = await connect();
+  net.onState((st) => { S = st; });
+  net.on("act", (msg, from) => { if (isHost() && world.acting) onAct(from, msg); });
+  net.on("bag", (m) => { if (m && typeof m.x === "number" && m.by !== me.id) bagFx(m); });
+  net.on("whee", (m) => { if (m && typeof m.x === "number" && m.by !== me.id) wheeFx(m); });
+  net.onDisconnect(() => { netDown = true; $("net").textContent = "Reconnecting…"; });
+  net.onReconnect(() => { netDown = false; });
+  net.onLive((live) => { $("event").textContent = ((live && live.active) || []).map((e) => e.title).join(" · "); });
+  if (!net.offline && typeof MP !== "undefined") board = MP.auth({ key: MP_CONNECT.key, apiUrl: MP_CONNECT.apiUrl }).leaderboard(CONFIG.board);
+  const taken = new Set([...Object.entries(S.entities.players || {}).filter(([id]) => id !== net.sessionId).map(([, p]) => p.c), ...botColors()]);
+  me.id = net.sessionId; me.color = COLORS.find((c) => !taken.has(c)) || pick(COLORS);
+  me.x = rnd(18, 30); me.y = 24; me.startedAt = performance.now();
+  net.me.set({ n: myName, c: me.color, hb: Date.now() });
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "name": "Leaf Pile",
+  "genre": "sim",
+  "dim": "2D",
+  "mode": "Drop-in",
+  "players": "1–8",
+  "hook": "Rake the biggest leaf pile. Then jump in it.",
+  "how": "Hold to rake leaves into your arms and let go to drop them on a pile; bag big piles for coins before a gust blows the small ones apart. The trees keep shedding all afternoon, and a pile of 60 or more is begging for a jump.",
+  "controls": "Hold the mouse to walk and rake (or WASD + hold Space), let go to drop, E bags, Q jumps in, B blower; touch: drag to walk, hold RAKE, BAG and JUMP by a pile",
+  "uses": [
+    ["Host-run rules", "The host's browser keeps every leaf and pile, runs the clock, the falling leaves and the gusts; if it leaves, the next player takes over."],
+    ["Live sync", "Everyone rakes the same yard: your own raking shows at once and lands for everyone a moment later."],
+    ["Bots", "Bot neighbors rake leaves to their own piles and bag them until enough people join."],
+    ["Leaderboard", "The most coins each player made in one afternoon."],
+    ["Live ops", "Make every wave of falling leaves bigger or smaller with no new deploy."]
+  ],
+  "ideas": [
+    "Add a squirrel that steals leaves from the biggest pile",
+    "Make it a beach, raking seaweed into piles",
+    "Let players trade coins for a bigger rake"
+  ]
+}
