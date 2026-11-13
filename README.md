@@ -31,7 +31,7 @@ Without a key it still runs, offline against bots.
 - One `index.html`. The comment at the top of the script maps the code and explains the multiplayer.
 - **Host-run rules:** The host's browser keeps every leaf and pile, runs the clock, the falling leaves and the gusts; if it leaves, the next player takes over.
 - **Live sync:** Everyone rakes the same yard: your own raking shows at once and lands for everyone a moment later.
-- **Bots:** Bot neighbors rake leaves to their own piles and bag them until enough people join.
+- **Bots:** Bot neighbors rake leaves to their own piles, bag them, jump in the big ones and buy the leaf blower too, until enough people join.
 - **Leaderboard:** The most coins each player made in one afternoon.
 - **Live ops:** Make every wave of falling leaves bigger or smaller with no new deploy.
 - `?attract` runs it offline with bots only. The preview video is recorded from it.

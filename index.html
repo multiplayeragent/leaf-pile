@@ -46,7 +46,7 @@
   .stats b { display: block; font-size: 20px; } .stats small { font-size: 11px; color: #7a5a3a; }
   .card h3 { margin: 14px 0 4px; font-size: 12px; color: #a0714a; text-transform: uppercase; letter-spacing: .06em; text-align: left; }
   .card ol { text-align: left; margin: 0 0 8px; padding-left: 26px; font-size: 14px; min-height: 20px; }
-  .card li span { float: right; font-variant-numeric: tabular-nums; } .card li.me { font-weight: 800; } .card li i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  .card li.msg { list-style: none; margin-left: -26px; color: #7a5a3a; } .card li span { float: right; font-variant-numeric: tabular-nums; } .card li.me { font-weight: 800; } .card li i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
   button.go { width: 100%; min-height: 48px; margin-top: 8px; border: 0; border-radius: 12px; background: #e4572e; color: #fff; font: 800 17px system-ui, sans-serif; cursor: pointer; box-shadow: 0 4px 0 #a8201a; }
   [hidden] { display: none !important; }
   .attract .hud, .attract .tbtn { display: none !important; }
@@ -82,7 +82,7 @@
     <h3>This afternoon's crew</h3>
     <ol id="crewList"></ol>
     <h3>Most coins in one afternoon</h3>
-    <ol id="board"><li>Loading the leaderboard…</li></ol>
+    <ol id="board"><li class="msg">Loading the leaderboard…</li></ol>
     <button class="go" id="again">Play again</button>
     <p id="next"></p>
   </div>
@@ -99,7 +99,7 @@
  *   LEAVES ........ leaf counts on the wire (chunks), my own raking blended on top, the action stream
  *   RAKING ........ the rake, the blower, dropping, bagging, jumping (the same for players and bots)
  *   AFTERNOON (HOST) the round, leaf waves, wind gusts, piles, coins, applying everyone's actions
- *   BOTS (HOST) ... neighbors who pick a spot, rake leaves to it, bag the pile (and sometimes jump in)
+ *   BOTS (HOST) ... neighbors who pick a spot, rake (or blow) leaves to it, bag the pile, sometimes jump in, buy the blower
  *   ME ............ my raker: walking, raking, dropping, bagging, jumping, sending my actions
  *   OTHERS ........ everyone else, eased between snapshots
  *   DRAW .......... camera, the painted yard, the leaf layer, piles, people, falling leaves, canopies, wind
@@ -444,6 +444,7 @@ function adoptWorld() {
   resetPending();
   world.bots.clear();
   for (const b of shared("bots", [])) if (b && typeof b.x === "number") world.bots.set(b.i, Object.assign(newRaker(b.i, b.n, b.c), { x: b.x, y: b.y, a: +b.a || 0, carry: +b.l || 0, tool: 0 }));
+  for (const b of world.bots.values()) world.carry[b.id] = b.carry; // their armfuls carry over too
   world.lastFlush = world.lastBots = performance.now();
   fitBots();
   if (!g) newDay(1);
@@ -586,7 +587,7 @@ function hostTick(dt, now) {
   }
   if (now - world.lastBots > 100) {
     world.lastBots = now;
-    net.setShared("bots", JSON.stringify([...world.bots.values()].map((b) => ({ i: b.id, n: b.name, c: b.color, x: +b.x.toFixed(2), y: +b.y.toFixed(2), a: +b.a.toFixed(2), l: Math.round(b.carry), r: b.raking ? 1 : 0, t: b.tool, w: b.moving ? 1 : 0, j: b.jumpAt && now - b.jumpAt < 700 ? 1 : 0 }))));
+    net.setShared("bots", JSON.stringify([...world.bots.values()].map((b) => ({ i: b.id, n: b.name, c: b.color, x: +b.x.toFixed(2), y: +b.y.toFixed(2), a: +b.a.toFixed(2), l: Math.round(b.carry), r: b.raking ? 1 : 0, t: b.tool, bl: b.blowing ? 1 : 0, w: b.moving ? 1 : 0, j: b.jumpAt && now - b.jumpAt < 700 ? 1 : 0 }))));
   }
 }
 
@@ -642,7 +643,7 @@ function walkTo(s, tx, ty, pace, dt) {
   return d;
 }
 function botTick(b, dt, now, g) {
-  b.raking = false;
+  b.raking = b.blowing = false;
   if (!g || g.ph !== "on") { b.moving = false; return; }
   if (b.jumpAt && now - b.jumpAt < 900) { b.moving = false; return; }
   if (now < b.waitUntil) { b.moving = false; return; }
@@ -650,6 +651,8 @@ function botTick(b, dt, now, g) {
   if (!b.home || (b.task === null && leavesNear(b.home.x, b.home.y, 7, get) < 20 && b.carry < 10)) { b.home = pickHome(b, get); b.task = null; if (!b.home) return; }
   const pile = pilesNow().find((p) => p.id !== "ghost" && Math.hypot(p.x - b.home.x, p.y - b.home.y) < CONFIG.mergeR + 0.5);
   if (b.task === null) {
+    const mine = scOf(day() || g, b.id);
+    if (!mine[3] && mine[0] >= CONFIG.blowerCost + 10 && Math.random() < 0.35) api.act(["u"]); // a bot buys the blower too, once it has coins to spare
     if (pile && pile.n >= b.bagAt && b.carry < 5) b.task = { k: "bag", pid: pile.id };
     else if (b.carry >= CONFIG.carryCap * 0.85) b.task = { k: "home" };
     else { const p = pickPatch(b, get); b.task = p && p.n > 3 ? { k: "out", x: p.x, y: p.y } : { k: "home" }; }
@@ -660,14 +663,19 @@ function botTick(b, dt, now, g) {
   } else if (t.k === "home") {
     const hx = b.home.x - Math.cos(b.a) * CONFIG.rakeAhead * 0.6, hy = b.home.y - Math.sin(b.a) * CONFIG.rakeAhead * 0.6, hd = headOf(b), left = Math.hypot(b.home.x - hd.x, b.home.y - hd.y);
     walkTo(b, hx, hy, CONFIG.botPace * 0.8, dt);
-    b.raking = left > 0.8 && b.carry < CONFIG.carryCap;
+    const blower = !!scOf(day() || g, b.id)[3] && left > 3.5 && b.carry < 10; // with a blower: blow the leaves ahead toward home, then rake them up there
+    b.tool = blower ? 1 : 0; b.blowing = blower && b.moving;
+    if (b.blowing) blowStep(b, dt, api);
+    b.raking = !blower && left > 0.8 && b.carry < CONFIG.carryCap;
     if (b.raking) rakeStep(b, dt, api);
-    if (left < 1.0 || (!b.moving && b.carry > 0)) { if (b.carry > 0) { api.act(["d", Math.round(hd.x * 10), Math.round(hd.y * 10)]); b.carry = 0; } b.task = null; b.waitUntil = now + rnd(150, 500); }
+    if (left < 1.0 || (!b.moving && b.carry > 0)) { b.tool = 0; if (b.carry > 0) { api.act(["d", Math.round(hd.x * 10), Math.round(hd.y * 10)]); b.carry = 0; } b.task = null; b.waitUntil = now + rnd(150, 500); }
   } else if (t.k === "bag") {
     const p = pilesNow().find((q) => q.id === t.pid);
     if (!p) { b.task = null; return; }
-    const st = { x: p.x, y: p.y + pileR(p.n) + 0.6 };
-    if (walkTo(b, st.x, st.y, CONFIG.botPace, dt) < 0.6) {
+    const R = pileR(p.n) + 0.6, dx = b.x - p.x, dy = b.y - p.y, d = Math.hypot(dx, dy) || 1, st = { x: p.x + (dx / d) * R, y: p.y + (dy / d) * R }; // walk up on my side of it
+    collide(st);
+    const close = Math.hypot(p.x - b.x, p.y - b.y) <= CONFIG.reach + pileR(p.n) * 0.5 - 0.2; // as close as a player must be to bag it (a pile by the curb or a tree can't be reached from every side)
+    if (close || walkTo(b, st.x, st.y, CONFIG.botPace, dt) < 0.6) { b.moving = false;
       b.a = Math.atan2(p.y - b.y, p.x - b.x);
       if (p.n >= 100 && Math.random() < (ATTRACT ? (b === me ? 1 : 0.35) : 0.2)) { b.jumpAt = now; api.act(["j", p.id]); } // the host's jumpPile/bagPile show the effects
       else api.act(["b", p.id]);
@@ -710,7 +718,8 @@ function myTick(dt, now) {
   const held = on && input.held() && !jumping;
   me.raking = held && me.tool === 0;
   if (me.raking) { if (rakeStep(me, dt, api)) me.rakedOnce = true; me.rustle = me.moving ? 1 : 0.4; } else me.rustle = 0;
-  if (held && me.tool === 1) blowStep(me, dt, api);
+  me.blowing = held && me.tool === 1;
+  if (me.blowing) blowStep(me, dt, api);
   if (me.wasRaking && !me.raking && me.carry > 0 && on) dropMine(api);
   me.wasRaking = me.raking;
   if (world.acting) me.carry = world.carry[me.id] || 0;
@@ -746,7 +755,7 @@ function toolMine() {
 function publish(now) {
   if (now - me.lastSend < CONFIG.sendMs) return;
   me.lastSend = now;
-  net.me.set("p", JSON.stringify({ x: +me.x.toFixed(2), y: +me.y.toFixed(2), a: +me.a.toFixed(2), l: Math.round(me.carry), r: me.raking ? 1 : 0, t: me.tool, w: me.moving ? 1 : 0, j: me.jumpAt && now - me.jumpAt < 700 ? 1 : 0, g: me.dayId }));
+  net.me.set("p", JSON.stringify({ x: +me.x.toFixed(2), y: +me.y.toFixed(2), a: +me.a.toFixed(2), l: Math.round(me.carry), r: me.raking ? 1 : 0, t: me.tool, bl: me.blowing ? 1 : 0, w: me.moving ? 1 : 0, j: me.jumpAt && now - me.jumpAt < 700 ? 1 : 0, g: me.dayId }));
 }
 const botColors = () => (world.acting ? [...world.bots.values()].map((b) => b.color) : shared("bots", []).map((b) => b && b.c));
 /** Two people in one color (or a bot has mine): the one with the higher sessionId picks a color nobody wears. */
@@ -771,7 +780,7 @@ function syncViews(now) {
       Object.assign(v, { fx: jump ? d.x : v.x, fy: jump ? d.y : v.y, fa: v.a, tx: d.x, ty: d.y, ta: +d.a || 0, gap: clamp(now - v.at, 60, 250), at: now });
     }
     if (d.j && !v.j) v.jumpAt = now;
-    Object.assign(v, { name, color, carry: +d.l || 0, raking: !!d.r, tool: +d.t || 0, moving: !!d.w, j: d.j });
+    Object.assign(v, { name, color, carry: +d.l || 0, raking: !!d.r, tool: +d.t || 0, blowing: !!d.bl, moving: !!d.w, j: d.j });
   };
   for (const [id, p] of Object.entries(S.entities.players || {})) if (id !== net.sessionId && live.has(id)) add(id, parseOnce("p:" + id, p.p, null), String(p.n || "Player").slice(0, 24), p.c || "#9aa3b5", false);
   if (!world.acting) for (const b of shared("bots", [])) if (b) add(b.i, b, b.n, b.c, true);
@@ -780,6 +789,7 @@ function syncViews(now) {
     const k = Math.min(1, (now - v.at) / v.gap);
     v.x = v.fx + (v.tx - v.fx) * k; v.y = v.fy + (v.ty - v.fy) * k; v.a = v.fa + angDiff(v.ta, v.fa) * k;
     if (v.raking && Math.random() < 0.15) { const h = headOf(v); flick(h.x, h.y, 1); }
+    if (v.blowing && Math.random() < 0.6) windFx(v.x + Math.cos(v.a) * 1.5, v.y + Math.sin(v.a) * 1.5, Math.cos(v.a), Math.sin(v.a)); // their blower, drawn here too
   }
 }
 /** Everyone to draw and count: me, the others, and (on the host) its own bots. */
@@ -1061,11 +1071,11 @@ function showOver(g) {
   $("stCoins").textContent = mine.coins; $("stBags").textContent = mine.bags; $("stJump").textContent = mine.jump ? `${mine.jump} 🍂` : "–";
   $("crewList").innerHTML = (g.res || []).map((r) => `<li class="${r.id === me.id ? "me" : ""}"><i style="background:${esc(r.c)}"></i>${esc(r.id === me.id ? "You" : r.n)}<span>🪙${r.coins}</span></li>`).join("");
   const list = $("board");
-  if (!board) { list.innerHTML = "<li>Leaderboards need a connection.</li>"; return; }
-  list.innerHTML = "<li>Loading…</li>";
+  if (!board) { list.innerHTML = "<li class=\"msg\">Leaderboards need a connection.</li>"; return; }
+  list.innerHTML = "<li class=\"msg\">Loading…</li>";
   (mine.coins > 0 ? board.submit(mine.coins).catch(() => null) : Promise.resolve()).then(() => board.top(10)).then(({ entries }) => {
-    list.innerHTML = entries.length ? entries.map((e) => `<li>${esc(e.username || "Player")}<span>🪙${e.score}</span></li>`).join("") : "<li>No afternoons yet. Set the first!</li>";
-  }).catch(() => { list.innerHTML = "<li>Couldn't load the leaderboard.</li>"; });
+    list.innerHTML = entries.length ? entries.map((e) => `<li>${esc(e.username || "Player")}<span>🪙${e.score}</span></li>`).join("") : "<li class=\"msg\">No afternoons yet. Set the first!</li>";
+  }).catch(() => { list.innerHTML = "<li class=\"msg\">Couldn't load the leaderboard.</li>"; });
 }
 $("again").onclick = () => { overDismissed = day()?.id ?? -1; };
 // Sound: a rustle while raking (noise through a filter), and little blips. Started by the first key or tap.
